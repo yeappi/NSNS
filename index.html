@@ -57,9 +57,38 @@ body.in-room #roomPane{display:flex}
 /* list */
 .scroll{flex:1;overflow-y:auto;min-height:0;overscroll-behavior:contain}
 .list{list-style:none;margin:0;padding:2px 8px 120px}
-.item{display:flex;align-items:center;gap:13px;padding:10px;border-radius:16px;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;position:relative;transition:background .15s}
-.item:hover{background:rgba(0,0,0,.025)}
+.iw{position:relative;border-radius:16px;overflow:hidden;margin:1px 0}
+.iw .acts{position:absolute;right:0;top:0;bottom:0;display:flex;visibility:hidden}
+.iw.sw .acts{visibility:visible}
+.iw .acts button{width:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:11px;color:#fff;background:#B5ACA2}
+.iw .acts button:nth-child(2){background:#958D84}
+.iw .acts button.del{background:#E27560}
+.iw .acts .i{font-size:18px;line-height:1.25}
+.item{display:flex;align-items:center;gap:13px;padding:10px;border-radius:16px;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;position:relative;background:var(--bg);transition:background .15s,transform .22s cubic-bezier(.2,.8,.2,1);touch-action:pan-y}
+.item:hover{background:#F6F3EF}
 .item.active{background:var(--accent-soft)}
+.item.sel{background:var(--accent-soft)}
+.item.dragging{opacity:.28}
+.item.ghost{position:fixed;z-index:100;pointer-events:none;box-shadow:0 14px 34px rgba(60,40,20,.22);opacity:.82;transition:none;background:#fff;margin:0}
+.iw.drop-before::before,.iw.drop-after::after{content:"";position:absolute;left:12px;right:12px;height:3px;border-radius:2px;background:var(--accent);z-index:3}
+.iw.drop-before::before{top:0}
+.iw.drop-after::after{bottom:0}
+.iw.drop-into .item{box-shadow:inset 0 0 0 2.5px var(--accent);background:var(--accent-soft)}
+#upbar{position:absolute;left:10px;right:10px;top:calc(4px + var(--safe-t));height:54px;border-radius:16px;border:2px dashed var(--accent);background:#FDEDE5;color:var(--accent-ink);display:flex;align-items:center;gap:12px;padding:0 16px;z-index:6;font-size:13.5px;font-weight:500;animation:fade .15s;box-shadow:var(--shadow)}
+#upbar .arr{display:flex;align-items:center;font-size:20px;font-weight:700}
+#upbar .arr i{display:block;width:36px;height:2.5px;background:currentColor;border-radius:2px;margin-left:-5px}
+#upbar.hot{background:var(--accent);color:#fff;border-style:solid}
+body.dragging-on,body.dragging-on *{cursor:grabbing!important}
+.lck{width:22px;height:22px;border-radius:50%;border:2px solid var(--faint);flex:none;background:#fff;margin-right:-3px}
+.item.sel .lck{background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12l4 4 8-8'/%3E%3C/svg%3E") center/14px no-repeat;border-color:var(--accent)}
+.lselbar{position:absolute;left:0;right:0;bottom:0;z-index:4}
+.trashrow{display:block;margin:20px auto 0;font-size:12.5px;color:var(--sub);padding:8px 14px;border-radius:12px}
+.trashrow:hover{background:rgba(0,0,0,.04)}
+.item .nmrow{display:flex;align-items:center;gap:6px;min-width:0}
+.item .nmrow .nm{flex:1;min-width:0}
+.item .tgs{display:flex;gap:4px;flex:none;max-width:52%;overflow:hidden}
+.item .tgs span{font-size:10.5px;color:var(--accent-ink);background:var(--accent-soft);padding:1px 7px;border-radius:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
+.item.active .tgs span,.item.sel .tgs span{background:#fff}
 .item .mid{flex:1;min-width:0}
 .item .nm{font-weight:500;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .item .nm .pin{font-size:11px;margin-left:5px;opacity:.55}
@@ -311,6 +340,7 @@ const ICONS={
   out:IC('<path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/>'),
   more:IC('<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>'),
   plus:IC('<path d="M12 5v14M5 12h14"/>'),
+  check:IC('<rect x="4" y="4" width="16" height="16" rx="5"/><path d="M8.5 12l2.5 2.5 4.5-5"/>'),
   img:IC('<rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 9"/>'),
   send:IC('<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>'),
 };
@@ -366,7 +396,7 @@ const DB={
 };
 
 /* ---------------- state & index ---------------- */
-const S={nodes:new Map(),msgs:new Map(),exports:new Map(),presets:new Map(),cwd:null,roomId:null,search:'',searchOpen:false,pending:[],urls:new Map(),sel:null,win:200,jump:null};
+const S={nodes:new Map(),msgs:new Map(),tnodes:new Map(),tmsgs:new Map(),lsel:null,swiped:null,exports:new Map(),presets:new Map(),cwd:null,roomId:null,search:'',searchOpen:false,pending:[],urls:new Map(),sel:null,win:200,jump:null};
 let VER=0,IDX=null;const bump=()=>{VER++};
 function idx(){
   if(IDX&&IDX.v===VER)return IDX;
@@ -388,13 +418,66 @@ function latestRoom(fid){let best=null,bt=-1;descendants(fid).forEach(d=>{if(d.t
 function nodeTagsDeep(rid){const c=idx().rtags;if(c.has(rid))return c.get(rid);const r=S.nodes.get(rid);const s=new Set();if(r){ancestors(rid).forEach(a=>(a.tags||[]).forEach(t=>s.add(t)));(r.tags||[]).forEach(t=>s.add(t))}const v=[...s];c.set(rid,v);return v}
 function msgTags(m){const s=new Set(nodeTagsDeep(m.roomId));hashtags(m.text).forEach(t=>s.add(t));return s}
 function allTags(){const s=new Map();const add=t=>s.set(t,(s.get(t)||0)+1);S.nodes.forEach(n=>(n.tags||[]).forEach(add));S.msgs.forEach(m=>hashtags(m.text).forEach(add));return [...s.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0])}
-function sortNodes(arr){return [...arr].sort((a,b)=>(!!b.pinned-!!a.pinned)||(lastAt(b)-lastAt(a)))}
+function sortNodes(arr){return [...arr].sort((a,b)=>((a.order??0)-(b.order??0))||(lastAt(b)-lastAt(a)))}
+function nextTopOrder(pid){const ks=kids(pid);return ks.length?Math.min(...ks.map(k=>k.order??0))-1:0}
+async function saveNodes(list){list.forEach(n=>S.nodes.set(n.id,n));bump();await DB.putMany('nodes',list)}
+async function renumber(pid){const sibs=sortNodes(kids(pid));sibs.forEach((x,k)=>x.order=k);await saveNodes(sibs)}
+async function normalizeOrders(){const groups=new Map();S.nodes.forEach(n=>{const p=n.parentId||null;if(!groups.has(p))groups.set(p,[]);groups.get(p).push(n)});const ch=[];
+  groups.forEach(arr=>{if(arr.every(n=>typeof n.order==='number'))return;arr.sort((a,b)=>((a.order??Infinity)-(b.order??Infinity))||(!!b.pinned-!!a.pinned)||(lastAt(b)-lastAt(a)));arr.forEach((n,i)=>{n.order=i;ch.push(n)})});if(ch.length)await saveNodes(ch)}
 
 async function saveNode(n){S.nodes.set(n.id,n);bump();await DB.put('nodes',n)}
 async function saveMsg(m){const {_tags,...clean}=m;S.msgs.set(m.id,m);bump();await DB.put('messages',clean)}
 async function saveMsgs(list){list.forEach(m=>S.msgs.set(m.id,m));bump();await DB.putMany('messages',list.map(({_tags,...c})=>c))}
 async function fixLastAt(rid){const r=S.nodes.get(rid);if(!r)return;const ms=roomMsgs(rid);r.lastAt=ms.length?ms[ms.length-1].createdAt:r.createdAt;await saveNode(r)}
-async function deleteMsgs(list){const rooms=new Set();for(const m of list){rooms.add(m.roomId);for(const b of m.images||[])await DB.del('blobs',b);S.msgs.delete(m.id);await DB.del('messages',m.id)}bump();for(const r of rooms)await fixLastAt(r)}
+const strip=({_tags,...c})=>c;
+async function moveToTrash(nodes,msgs,roots){
+  const tid=uid(),t=now();
+  for(const n of nodes){n.deletedAt=t;n.trashId=tid;if(roots.has(n.id))n.trashRoot=true;S.nodes.delete(n.id);S.tnodes.set(n.id,n)}
+  for(const m of msgs){delete m._tags;m.deletedAt=t;m.trashId=tid;S.msgs.delete(m.id);S.tmsgs.set(m.id,m)}
+  bump();await DB.putMany('nodes',nodes);await DB.putMany('messages',msgs.map(strip));
+  for(const r of new Set(msgs.map(m=>m.roomId)))if(S.nodes.has(r))await fixLastAt(r);
+  return tid;
+}
+async function trashMsgList(list){if(!list.length)return;const tid=await moveToTrash([],list,new Set());renderRoom(true);renderList();toast(`メモ${list.length}件をごみ箱に移しました`,'元に戻す',()=>restoreTrash(tid))}
+async function restoreRoom(){let r=[...S.nodes.values()].find(n=>n.type==='room'&&!n.parentId&&n.name==='復元したメモ');
+  if(!r){r={id:uid(),type:'room',parentId:null,name:'復元したメモ',emoji:'♻️',color:PALETTE[7],tags:[],badge:false,order:nextTopOrder(null),createdAt:now(),lastAt:now()};await saveNode(r)}return r}
+async function restoreTrash(tid){
+  const ns=[...S.tnodes.values()].filter(n=>n.trashId===tid),ms=[...S.tmsgs.values()].filter(m=>m.trashId===tid);
+  if(!ns.length&&!ms.length)return;
+  const roots=ns.filter(n=>n.trashRoot);
+  for(const n of ns){delete n.deletedAt;delete n.trashId;delete n.trashRoot;S.tnodes.delete(n.id);S.nodes.set(n.id,n)}
+  bump();const parents=new Set();
+  roots.forEach((n,i)=>{if(n.parentId&&!S.nodes.has(n.parentId))n.parentId=null;n.order=-1e6+i;parents.add(n.parentId||null)});
+  let fb=null;
+  for(const m of ms){if(!S.nodes.has(m.roomId)){fb=fb||await restoreRoom();m.roomId=fb.id}delete m.deletedAt;delete m.trashId;S.tmsgs.delete(m.id);S.msgs.set(m.id,m)}
+  bump();await saveNodes(ns);await DB.putMany('messages',ms.map(strip));
+  for(const r of new Set(ms.map(m=>m.roomId)))await fixLastAt(r);
+  for(const p of parents)await renumber(p);
+  renderList();renderRoom(true);toast(`元に戻しました${fb?'（「復元したメモ」に入れました）':''}`);
+}
+async function purgeTrash(pred){
+  const ms=[...S.tmsgs.values()].filter(pred),ns=[...S.tnodes.values()].filter(pred);
+  for(const m of ms){for(const b of m.images||[])await DB.del('blobs',b);await DB.del('messages',m.id);S.tmsgs.delete(m.id)}
+  for(const n of ns){await DB.del('nodes',n.id);S.tnodes.delete(n.id)}
+}
+function trashGroups(){const g=new Map();const add=(x,k)=>{let b=g.get(x.trashId);if(!b)g.set(x.trashId,b={id:x.trashId,at:x.deletedAt,nodes:[],msgs:[]});b[k].push(x)};
+  S.tnodes.forEach(n=>add(n,'nodes'));S.tmsgs.forEach(m=>add(m,'msgs'));return [...g.values()].sort((a,b)=>b.at-a.at)}
+function trashInfo(b){const roots=b.nodes.filter(n=>n.trashRoot);
+  if(roots.length)return {title:roots.map(r=>`${r.type==='folder'?'📁':'💬'} ${r.name}`).join('、'),sub:[b.nodes.length>roots.length?`中身 ${b.nodes.length-roots.length}件`:'',`メモ ${b.msgs.length}件`].filter(Boolean).join('・')};
+  const m=b.msgs[0];const room=S.nodes.get(m?.roomId)||S.tnodes.get(m?.roomId);
+  return {title:`メモ ${b.msgs.length}件${room?`（${room.name}）`:''}`,sub:((m?.text||'📷 画像').replace(/\n/g,' ')).slice(0,50)}}
+function trashSheet(){
+  const gs=trashGroups();
+  const sh=openSheet(`<div class="shead"><h3>ごみ箱</h3>${gs.length?'<button data-x="empty">空にする</button>':''}</div>
+    <p class="hint" style="margin:-4px 2px 12px">削除してから90日たつと、自動で完全に削除されます。</p>
+    ${gs.length?`<div class="hist">${gs.map(b=>{const i=trashInfo(b);const left=Math.max(0,90-Math.floor((now()-b.at)/86400000));
+      return `<div class="h" data-t="${b.id}"><div class="d"><div class="l">${esc(i.title)}</div><div class="s">${esc(i.sub)}</div><div class="s">${mdhm(b.at)} に削除・あと${left}日</div></div><button class="chip on" data-r="${b.id}">戻す</button></div>`}).join('')}</div>`:'<div class="empty" style="padding:30px">ごみ箱は空です</div>'}`);
+  sh.querySelectorAll('[data-r]').forEach(bt=>bt.onclick=async e=>{e.stopPropagation();closeSheet();await restoreTrash(bt.dataset.r);trashSheet()});
+  sh.querySelectorAll('[data-t]').forEach(el=>el.onclick=()=>{const id=el.dataset.t;menuSheet('',[
+    {icon:'↺',label:'元に戻す',fn:async()=>{closeSheet();await restoreTrash(id);trashSheet()}},
+    {icon:'🗑',label:'完全に削除',sub:'元に戻せなくなります',danger:true,fn:async()=>{if(!await confirmSheet('完全に削除しますか？','元に戻せなくなります。','完全に削除',true))return;closeSheet();await purgeTrash(x=>x.trashId===id);trashSheet();fillListBody()}}])});
+  const em=sh.querySelector('[data-x=empty]');if(em)em.onclick=async()=>{if(!await confirmSheet('ごみ箱を空にしますか？',`${gs.length}件がすべて完全に削除されます。`,'空にする',true))return;closeSheet();await purgeTrash(()=>true);toast('ごみ箱を空にしました');fillListBody()};
+}
 async function blobURL(id){if(S.urls.has(id))return S.urls.get(id);const r=await DB.get('blobs',id);if(!r)return '';const u=URL.createObjectURL(r.blob);S.urls.set(id,u);return u}
 function hydrate(root){root.querySelectorAll('img[data-blob]').forEach(async img=>{if(img.getAttribute('src'))return;img.src=await blobURL(img.dataset.blob)})}
 
@@ -412,26 +495,43 @@ function avatar(n,sm){
    LIST PANE
    ========================================================= */
 function renderList(){
+  S.swiped=null;
   const P=$('#listPane');const cwd=S.cwd?S.nodes.get(S.cwd):null;if(S.cwd&&!cwd)S.cwd=null;
+  const selBtn=`<button class="icon" data-act="lselStart" title="まとめて選択">${ICONS.check}</button>`;
   let head;
-  if(cwd){
+  if(S.lsel){
+    const all=kids(S.cwd);const allOn=all.length&&all.every(k=>S.lsel.has(k.id));
+    head=`<div class="top"><button class="icon" data-act="lselExit" title="選択をやめる">${ICONS.close}</button>
+      <div class="ttl"><div class="tx"><div class="nm">${S.lsel.size}件を選択</div><div class="sb">${cwd?esc(cwd.name):'ホーム'}</div></div></div>
+      <button class="chip" data-act="lselAll" style="margin-right:6px">${allOn?'すべて解除':'すべて選択'}</button></div>`;
+  }else if(cwd){
     const anc=ancestors(cwd.id);
     const crumbs=`<button data-act="goto" data-id="">ホーム</button>${anc.map(a=>` › <button data-act="goto" data-id="${a.id}">${esc(a.name)}</button>`).join('')}`;
     head=`<div class="top">
       <button class="icon" data-act="up" title="戻る">${ICONS.back}</button>
       <div class="ttl">${avatar(cwd,true)}<div class="tx"><div class="nm">${esc(cwd.name)}</div><div class="sb">${crumbs}</div></div></div>
+      ${selBtn}
       <button class="icon" data-act="exportHere" title="書き出す">${ICONS.out}</button>
       <button class="icon" data-act="nodeMenu" data-id="${cwd.id}" title="メニュー">${ICONS.more}</button></div>`;
   }else{
     head=`<div class="top"><div class="brand">NSNS <small>Not SNS</small></div>
       <button class="icon" data-act="toggleSearch" title="検索">${ICONS.search}</button>
+      ${selBtn}
       <button class="icon" data-act="exportHere" title="書き出す">${ICONS.out}</button>
       <button class="icon" data-act="settings" title="設定">${ICONS.gear}</button></div>`;
   }
-  if(S.searchOpen)head+=`<div class="searchbox">${ICONS.search}<input id="q" placeholder="名前・#タグ・本文で探す" value="${esc(S.search)}"></div>`;
-  P.innerHTML=head+`<div class="scroll" id="listScroll"></div><button class="fab" data-act="newMenu" title="追加">${ICONS.plus}</button>`;
+  if(S.searchOpen&&!S.lsel)head+=`<div class="searchbox">${ICONS.search}<input id="q" placeholder="名前・#タグ・本文で探す" value="${esc(S.search)}"></div>`;
+  const n=S.lsel?S.lsel.size:0;
+  const bottom=S.lsel?`<div class="selbar lselbar">
+      <button class="pri" data-act="lselExport" ${n?'':'disabled'}><span class="ic">↗</span>書き出す</button>
+      <button data-act="lselGroup" ${n?'':'disabled'}><span class="ic">📁</span>まとめる</button>
+      <button data-act="lselMove" ${n?'':'disabled'}><span class="ic">⇢</span>移動</button>
+      <button data-act="lselDelete" ${n?'':'disabled'} style="color:#C9583F"><span class="ic">🗑</span>削除</button></div>`
+    :`<button class="fab" data-act="newMenu" title="追加">${ICONS.plus}</button>`;
+  P.innerHTML=head+`<div class="scroll" id="listScroll"></div>`+bottom;
   fillListBody();
   const qi=$('#q');if(qi){qi.oninput=e=>{S.search=e.target.value;fillListBody()}}
+  if(D.active)drawUpbar();
 }
 function backupReminder(){
   if(S.cwd||S.searchOpen||S.msgs.size<10)return '';
@@ -441,6 +541,7 @@ function backupReminder(){
   return `<div class="remind"><span>${last?`最後のバックアップから${Math.floor((now()-last)/86400000)}日たちました`:'まだバックアップがありません'}</span><button data-act="backup">今する</button><button class="x" data-act="snoozeBackup">あとで</button></div>`;
 }
 function fillListBody(){
+  S.swiped=null;
   const q=S.search.trim().toLowerCase();let html='';
   if(S.searchOpen&&q){
     const nodeHits=[],msgHits=[];
@@ -455,6 +556,7 @@ function fillListBody(){
     if(items.length)html=backupReminder()+`<ul class="list">${items.join('')}</ul>`;
     else if(!S.cwd&&S.nodes.size===0)html=`<div class="empty"><div class="big">🫧</div><p>まだ何もありません</p><p>右下の ＋ からトークをつくって、<br>思いついたことをどんどん投げ込もう。</p><p style="margin-top:22px"><button class="btn" style="padding:0 18px;flex:none" data-act="seed">サンプルで試す</button></p></div>`;
     else html=`<div class="empty"><p>からっぽです</p><p>＋ でトークやフォルダを追加</p></div>`;
+    if(!S.cwd&&!S.lsel){const tg=trashGroups().length;if(tg)html+=`<button class="trashrow" data-act="trash">🗑 ごみ箱（${tg}）</button>`}
   }
   $('#listScroll').innerHTML=html;
 }
@@ -465,12 +567,17 @@ function itemHTML(n,o={}){
   else{const r=latestRoom(n.id);if(r){const ms=roomMsgs(r.id);const l=ms[ms.length-1];pv=r.name+'：'+(l?((l.text||'').replace(/\n/g,' ')||'📷 画像'):'—')}else pv=kids(n.id).length?`${kids(n.id).length}件`:'からっぽ';t=lastAt(n)}
   if(o.path){const a=ancestors(n.id).map(x=>x.name);if(a.length&&!o.msg)pv=a.join(' › ')+'　'+pv}
   const un=o.msg?0:badgeCount(n);
-  return `<li class="item${n.id===S.roomId&&!o.msg?' active':''}" data-act="open" data-id="${n.id}"${o.msg?` data-msg="${o.msg.id}"`:''} data-lp="${n.id}">
-    ${avatar(n)}
-    <div class="mid"><div class="nm">${esc(n.name)}${n.pinned&&!o.msg?'<span class="pin">📌</span>':''}</div><div class="pv">${esc(pv)}</div></div>
-    <div class="rt"><div class="tm">${t?fmtTime(t):''}</div>${un?`<span class="badge" title="未書き出し">${un>99?'99+':un}</span>`:'<span style="height:20px"></span>'}</div>
-    ${o.msg?'':`<button class="more" data-act="nodeMenu" data-id="${n.id}" title="メニュー">${ICONS.more}</button>`}
-  </li>`;
+  const sel=!!S.lsel&&!o.msg;
+  const tg=n.tags||[];
+  const tags=tg.length?`<span class="tgs">${tg.slice(0,2).map(x=>`<span>#${esc(x)}</span>`).join('')}${tg.length>2?`<span>+${tg.length-2}</span>`:''}</span>`:'';
+  return `<li class="iw" data-nid="${n.id}"${o.msg?' data-static="1"':''}>
+    ${o.msg||sel?'':`<div class="acts"><button data-act="swEdit" data-id="${n.id}"><span class="i">✎</span>編集</button><button data-act="swMore" data-id="${n.id}"><span class="i">⋯</span>その他</button><button class="del" data-act="swDel" data-id="${n.id}"><span class="i">🗑</span>削除</button></div>`}
+    <div class="item${n.id===S.roomId&&!o.msg?' active':''}${sel&&S.lsel.has(n.id)?' sel':''}" data-act="open" data-id="${n.id}"${o.msg?` data-msg="${o.msg.id}"`:''}>
+      ${sel?'<span class="lck"></span>':''}${avatar(n)}
+      <div class="mid"><div class="nmrow"><div class="nm">${esc(n.name)}</div>${tags}</div><div class="pv">${esc(pv)}</div></div>
+      <div class="rt"><div class="tm">${t?fmtTime(t):''}</div>${un?`<span class="badge" title="未書き出し">${un>99?'99+':un}</span>`:'<span style="height:20px"></span>'}</div>
+      ${o.msg||sel?'':`<button class="more" data-act="nodeMenu" data-id="${n.id}" title="メニュー">${ICONS.more}</button>`}
+    </div></li>`;
 }
 
 /* =========================================================
@@ -489,7 +596,7 @@ function renderRoom(keepScroll){
     const n=S.sel.size;const anyNew=[...S.sel].some(id=>!S.msgs.get(id)?.exportedAt);
     bottom=`<div class="selbar">
       <button class="pri" data-act="selExport" ${n?'':'disabled'}><span class="ic">↗</span>書き出す</button>
-      <button data-act="selCopy" ${n?'':'disabled'}><span class="ic">⧉</span>コピー</button>
+      ${n===1?'<button data-act="selEdit"><span class="ic">✎</span>編集</button>':''}<button data-act="selCopy" ${n?'':'disabled'}><span class="ic">⧉</span>コピー</button>
       <button data-act="selMark" ${n?'':'disabled'}><span class="ic">${anyNew?'✓':'○'}</span>${anyNew?'済みにする':'未に戻す'}</button>
       <button data-act="selMove" ${n?'':'disabled'}><span class="ic">⇢</span>移動</button>
       <button data-act="selDelete" ${n?'':'disabled'} style="color:#C9583F"><span class="ic">🗑</span>削除</button></div>`;
@@ -497,6 +604,7 @@ function renderRoom(keepScroll){
     head=`<div class="top">
       <button class="icon only-mobile" data-act="closeRoom">${ICONS.back}</button>
       <div class="ttl">${avatar(r,true)}<div class="tx"><div class="nm">${esc(r.name)}</div><div class="sb">${esc(path||'ホーム')}</div></div></div>
+      <button class="icon" data-act="selStartEmpty" title="まとめて選択">${ICONS.check}</button>
       <button class="icon" data-act="exportRoom" title="書き出す">${ICONS.out}</button>
       <button class="icon" data-act="nodeMenu" data-id="${r.id}" title="メニュー">${ICONS.more}</button></div>`;
     bottom=`<div class="composer">
@@ -564,7 +672,7 @@ async function sendMsg(){
   const m={id:uid(),roomId:S.roomId,text:text.trim()?text:'',images:ids,createdAt:now(),exportedAt:null,exportId:null};
   await saveMsg(m);const r=S.nodes.get(S.roomId);r.lastAt=m.createdAt;await saveNode(r);
   S.pending=[];ta.value='';LS.set('draft:'+r.id,'');autoGrow(ta);renderPending();renderChat(true);renderList();ta.focus();
-  if(roomMsgs(r.id).length===1)hintOnce('msgLP','メモは長押し（右クリック）で選択・書き出しできます');
+  if(roomMsgs(r.id).length===1)hintOnce('msgLP','メモは長押しで選択して、まとめて書き出せます');
 }
 
 /* selection */
@@ -649,42 +757,48 @@ function editNodeSheet(n,isNew){
   sh.querySelector('[data-x=ok]').onclick=async()=>{
     n.name=nm.value.trim()||(isRoom?'無題のトーク':'無題のフォルダ');n.emoji=emoji;n.color=color;n.tags=getTags();if(isRoom)n.badge=badge;
     await saveNode(n);closeSheet();
-    if(isNew){hintOnce('nodeLP','トークやフォルダは長押し（右クリック）でメニューが出ます');if(isRoom)openRoom(n.id);else{S.cwd=n.id;renderList()}}
+    if(isNew){hintOnce('nodeLP','左にスワイプで編集・削除、長押しで並べ替えできます');if(isRoom)openRoom(n.id);else{S.cwd=n.id;renderList()}}
     else{renderList();renderRoom(true)}
   };
 }
-function newNode(type){editNodeSheet({id:uid(),type,parentId:S.cwd,name:'',emoji:'',color:PALETTE[Math.floor(Math.random()*7)],tags:[],badge:type==='room',pinned:false,createdAt:now(),lastAt:type==='room'?now():null},true)}
+function newNode(type){editNodeSheet({id:uid(),type,parentId:S.cwd,name:'',emoji:'',color:PALETTE[Math.floor(Math.random()*7)],tags:[],badge:type==='room',order:nextTopOrder(S.cwd),createdAt:now(),lastAt:type==='room'?now():null},true)}
 
 function nodeMenu(id){
   const n=S.nodes.get(id);if(!n)return;
   menuSheet(n.name,[
     {icon:'✎',label:'名前・アイコン・タグを編集',fn:()=>editNodeSheet(n)},
-    {icon:'📌',label:n.pinned?'ピン留めを外す':'ピン留め',sub:n.pinned?'':'一覧の上に固定します',fn:async()=>{n.pinned=!n.pinned;await saveNode(n);renderList()}},
     {icon:'↗',label:'ここから書き出す',fn:()=>openExport({scope:[n.id]})},
     {icon:'⇢',label:'移動する',fn:()=>moveSheet(n)},
     n.type==='room'?{icon:n.badge?'○':'●',label:n.badge?'バッジを出さない':'未書き出しバッジを出す',fn:async()=>{n.badge=!n.badge;await saveNode(n);renderList()}}:null,
     {icon:'↺',label:'書き出し済みの印をすべて外す',fn:async()=>{const set=new Set(n.type==='room'?[n.id]:descendants(n.id).filter(d=>d.type==='room').map(d=>d.id));const ch=[...S.msgs.values()].filter(m=>set.has(m.roomId)&&m.exportedAt);ch.forEach(m=>{m.exportedAt=null;m.exportId=null});await saveMsgs(ch);renderList();renderChat();toast(`${ch.length}件の印を外しました`)}},
-    {icon:'🗑',label:'削除',danger:true,fn:()=>deleteNode(n)},
+    {icon:'🗑',label:'ごみ箱へ',sub:'90日間は元に戻せます',danger:true,fn:()=>deleteNodes([n])},
   ]);
 }
-async function deleteNode(n){
-  const ds=n.type==='folder'?descendants(n.id):[];const set=new Set([n,...ds].filter(x=>x.type==='room').map(x=>x.id));
-  const list=[...S.msgs.values()].filter(m=>set.has(m.roomId));
-  if(!await confirmSheet(`「${n.name}」を削除しますか？`,n.type==='folder'?`中のトーク・フォルダ ${ds.length}件、メモ ${list.length}件もすべて消えます。`:`メモ ${list.length}件が消えます。`,'削除する',true))return;
-  await deleteMsgs(list);
-  for(const x of [n,...ds]){S.nodes.delete(x.id);await DB.del('nodes',x.id)}bump();
-  if(S.roomId&&!S.nodes.has(S.roomId))closeRoom();if(S.cwd&&!S.nodes.has(S.cwd))S.cwd=n.parentId&&S.nodes.has(n.parentId)?n.parentId:null;
-  renderList();renderRoom();toast('削除しました');
+async function deleteNodes(list){
+  list=list.filter(n=>S.nodes.has(n.id));if(!list.length)return;
+  const all=new Map();list.forEach(n=>{all.set(n.id,n);if(n.type==='folder')descendants(n.id).forEach(d=>all.set(d.id,d))});
+  const rooms=new Set([...all.values()].filter(x=>x.type==='room').map(x=>x.id));
+  const msgs=[...S.msgs.values()].filter(m=>rooms.has(m.roomId));
+  const parent=list[0].parentId||null;
+  const tid=await moveToTrash([...all.values()],msgs,new Set(list.map(n=>n.id)));
+  if(S.roomId&&!S.nodes.has(S.roomId)){S.roomId=null;S.sel=null;document.body.classList.remove('in-room')}
+  if(S.cwd&&!S.nodes.has(S.cwd))S.cwd=S.nodes.has(parent)?parent:null;
+  renderList();renderRoom(true);
+  toast(list.length===1?`「${list[0].name}」をごみ箱に移しました`:`${list.length}件をごみ箱に移しました`,'元に戻す',()=>restoreTrash(tid));
 }
 function treeRows(pid,depth,o){let out=[];[...kids(pid)].filter(k=>k.type==='folder'||o.rooms).sort((a,b)=>(a.type===b.type?0:a.type==='folder'?-1:1)||a.name.localeCompare(b.name,'ja')).forEach(k=>{out.push(o.row(k,depth));if(k.type==='folder')out=out.concat(treeRows(k.id,depth+1,o))});return out}
-function moveSheet(n){
-  const bad=new Set([n.id,...(n.type==='folder'?descendants(n.id).map(d=>d.id):[])]);
-  let target=n.parentId||'';
+function moveSheet(n){moveNodesSheet([n])}
+function moveNodesSheet(list,onDone){
+  const bad=new Set();list.forEach(n=>{bad.add(n.id);if(n.type==='folder')descendants(n.id).forEach(d=>bad.add(d.id))});
+  let target=list.length===1?(list[0].parentId||''):(S.cwd||'');
   const rows=[`<div class="row ${!target?'on':''}" data-t=""><span class="ck">✓</span>🏠 ホーム（いちばん上）</div>`].concat(treeRows(null,0,{row:(k,d)=>`<div class="row ${bad.has(k.id)?'dis':''} ${k.id===target?'on':''}" data-t="${k.id}" style="padding-left:${8+d*20}px"><span class="ck">✓</span>${avatar(k,true)}<span>${esc(k.name)}</span></div>`}));
-  const sh=openSheet(`<h3>「${esc(n.name)}」の移動先</h3><div class="tree">${rows.join('')}</div><div class="btns" style="margin-top:14px"><button class="btn" data-x="no">やめる</button><button class="btn pri" data-x="ok">ここに移動</button></div>`);
+  const sh=openSheet(`<h3>${list.length===1?`「${esc(list[0].name)}」`:`${list.length}件`}の移動先</h3><div class="tree">${rows.join('')}</div><div class="btns" style="margin-top:14px"><button class="btn" data-x="no">やめる</button><button class="btn pri" data-x="ok">ここに移動</button></div>`);
   sh.querySelectorAll('[data-t]').forEach(r=>r.onclick=()=>{target=r.dataset.t;sh.querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('on',x===r))});
   sh.querySelector('[data-x=no]').onclick=()=>closeSheet();
-  sh.querySelector('[data-x=ok]').onclick=async()=>{n.parentId=target||null;await saveNode(n);closeSheet();renderList();renderRoom(true);toast('移動しました')};
+  sh.querySelector('[data-x=ok]').onclick=async()=>{
+    const pid=target||null;const ks=sortNodes(kids(pid)).filter(x=>!list.includes(x));
+    list.forEach(n=>n.parentId=pid);const all=[...list,...ks];all.forEach((x,k)=>x.order=k);await saveNodes(all);
+    closeSheet();onDone&&onDone();renderList();renderRoom(true);toast('移動しました')};
 }
 function moveMsgsSheet(list){
   let target=null;
@@ -705,7 +819,7 @@ function msgMenu(id){
     {icon:'✎',label:'編集',sub:'本文の一部だけ選んでコピーしたいときもここから',fn:()=>editMsg(m)},
     {icon:'⇢',label:'別のトークへ移動',fn:()=>moveMsgsSheet([m])},
     {icon:m.exportedAt?'○':'✓',label:m.exportedAt?'未書き出しに戻す':'書き出し済みにする',fn:async()=>{m.exportedAt=m.exportedAt?null:now();if(!m.exportedAt)m.exportId=null;await saveMsg(m);renderChat();renderList()}},
-    {icon:'🗑',label:'削除',danger:true,fn:async()=>{if(!await confirmSheet('このメモを削除しますか？','','削除する',true))return;await deleteMsgs([m]);renderChat();renderList()}},
+    {icon:'🗑',label:'ごみ箱へ',danger:true,fn:()=>trashMsgList([m])},
   ]);
 }
 function editMsg(m){
@@ -1021,16 +1135,18 @@ function settings(){
       <button data-m="backup"><span class="ic">💾</span><span>まるごとバックアップ（.json）<span class="sub">画像・書き出し履歴・保存した条件も含みます</span></span></button>
       <button data-m="restore"><span class="ic">📥</span><span>バックアップから復元</span></button>
       <button data-m="history"><span class="ic">🕘</span><span>書き出し履歴</span></button>
+      <button data-m="trash"><span class="ic">🗑</span><span>ごみ箱<span class="sub">消したものは90日間ここから戻せます</span></span></button>
     </div>`);
   sh.querySelector('[data-m=backup]').onclick=()=>{closeSheet();backup()};
   sh.querySelector('[data-m=restore]').onclick=()=>{closeSheet();$('#fileBackup').click()};
   sh.querySelector('[data-m=history]').onclick=()=>{closeSheet();historySheet()};
+  sh.querySelector('[data-m=trash]').onclick=()=>{closeSheet();trashSheet()};
 }
 async function backup(){
   toast('バックアップを作っています…');
   const toB64=b=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b)});
   const blobs=[];for(const m of S.msgs.values())for(const id of m.images||[]){const r=await DB.get('blobs',id);if(r)blobs.push({id,data:await toB64(r.blob)})}
-  const data={app:'NSNS',version:2,at:now(),nodes:[...S.nodes.values()],messages:[...S.msgs.values()].map(({_tags,...m})=>m),blobs,exports:[...S.exports.values()],presets:[...S.presets.values()]};
+  const data={app:'NSNS',version:2,at:now(),nodes:[...S.nodes.values(),...S.tnodes.values()],messages:[...S.msgs.values(),...S.tmsgs.values()].map(({_tags,...m})=>m),blobs,exports:[...S.exports.values()],presets:[...S.presets.values()]};
   if(await download(new Blob([JSON.stringify(data)],{type:'application/json'}),`NSNS_backup_${ymd(now())}.json`)){LS.set('lastBackup',now());fillListBody()}
 }
 function dataURLtoBlob(u){const [h,d]=u.split(',');const mime=(h.match(/:(.*?);/)||[])[1]||'application/octet-stream';const bin=atob(d);const a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return new Blob([a],{type:mime})}
@@ -1039,11 +1155,11 @@ async function restore(file){
     const d=JSON.parse(await file.text());if(d.app!=='NSNS')throw 0;
     if(!await confirmSheet('バックアップを読み込みますか？',`トーク・フォルダ ${d.nodes.length}件、メモ ${d.messages.length}件。同じものは上書きされ、それ以外は残ります。`,'読み込む'))return;
     for(const b of d.blobs||[])await DB.put('blobs',{id:b.id,blob:dataURLtoBlob(b.data)});
-    for(const n of d.nodes)S.nodes.set(n.id,n);await DB.putMany('nodes',d.nodes);
-    for(const m of d.messages)S.msgs.set(m.id,m);await DB.putMany('messages',d.messages);
+    for(const n of d.nodes)(n.deletedAt?S.tnodes:S.nodes).set(n.id,n);await DB.putMany('nodes',d.nodes);
+    for(const m of d.messages)(m.deletedAt?S.tmsgs:S.msgs).set(m.id,m);await DB.putMany('messages',d.messages);
     for(const x of d.exports||[])S.exports.set(x.id,x);await DB.putMany('exports',d.exports||[]);
     for(const x of d.presets||[])S.presets.set(x.id,x);await DB.putMany('presets',d.presets||[]);
-    bump();renderList();renderRoom();toast('読み込みました');
+    bump();await normalizeOrders();renderList();renderRoom();toast('読み込みました');
   }catch(e){toast('読み込めませんでした')}
 }
 
@@ -1054,7 +1170,7 @@ function openRoom(id,msgId){S.roomId=id;S.pending=[];S.sel=null;S.win=200;S.jump
 function closeRoom(){S.roomId=null;S.sel=null;document.body.classList.remove('in-room');renderRoom();renderList()}
 
 const ACT={
-  open:el=>{const n=S.nodes.get(el.dataset.id);if(!n)return;if(el.dataset.msg){openRoom(n.id,el.dataset.msg);return}
+  open:el=>{const n=S.nodes.get(el.dataset.id);if(!n)return;if(S.lsel&&!el.dataset.msg){S.lsel.has(n.id)?S.lsel.delete(n.id):S.lsel.add(n.id);renderList();return}if(el.dataset.msg){openRoom(n.id,el.dataset.msg);return}
     if(n.type==='folder'){S.cwd=n.id;S.search='';S.searchOpen=false;renderList()}else openRoom(n.id)},
   up:()=>{const c=S.nodes.get(S.cwd);S.cwd=c?.parentId||null;renderList()},
   goto:(el,e)=>{e.stopPropagation();S.cwd=el.dataset.id||null;renderList()},
@@ -1079,24 +1195,155 @@ const ACT={
   selCopy:async()=>{const l=selList();if(await copyText(blocksToText(buildBlocks(l),'ph'),true)){toast(`${l.length}件をコピーしました`);selExit()}},
   selMark:async()=>{const l=selList();const anyNew=l.some(m=>!m.exportedAt);l.forEach(m=>{m.exportedAt=anyNew?now():null;if(!anyNew)m.exportId=null});await saveMsgs(l);selExit();renderList();toast(anyNew?`${l.length}件を書き出し済みにしました`:`${l.length}件を未書き出しに戻しました`)},
   selMove:()=>moveMsgsSheet(selList()),
-  selDelete:async()=>{const l=selList();if(!await confirmSheet(`${l.length}件のメモを削除しますか？`,'','削除する',true))return;await deleteMsgs(l);selExit();renderList()},
+  selDelete:async()=>{const l=selList();S.sel=null;await trashMsgList(l)},
+  selStartEmpty:()=>selStart(),
+  selEdit:()=>{const l=selList();if(l.length!==1)return;S.sel=null;renderRoom(true);editMsg(l[0])},
+  swEdit:(el,e)=>{e.stopPropagation();const n=S.nodes.get(el.dataset.id);closeSwipe();if(n)editNodeSheet(n)},
+  swMore:(el,e)=>{e.stopPropagation();closeSwipe();nodeMenu(el.dataset.id)},
+  swDel:(el,e)=>{e.stopPropagation();const n=S.nodes.get(el.dataset.id);if(n)deleteNodes([n])},
+  trash:()=>trashSheet(),
+  lselStart:()=>{S.lsel=new Set();S.searchOpen=false;S.search='';renderList()},
+  lselExit:()=>{S.lsel=null;renderList()},
+  lselAll:()=>{const ks=kids(S.cwd);if(ks.length&&ks.every(k=>S.lsel.has(k.id)))S.lsel.clear();else ks.forEach(k=>S.lsel.add(k.id));renderList()},
+  lselExport:()=>{const ids=lselList().map(n=>n.id);S.lsel=null;renderList();openExport({scope:ids})},
+  lselGroup:async()=>{const l=lselList();if(!l.length)return;const pid=S.cwd;
+    const f={id:uid(),type:'folder',parentId:pid,name:'新しいフォルダ',emoji:'',color:PALETTE[Math.floor(Math.random()*7)],tags:[],createdAt:now(),order:(l[0].order??0)-0.5};
+    l.forEach((n,i)=>{n.parentId=f.id;n.order=i});await saveNodes([f,...l]);await renumber(pid);S.lsel=null;renderList();
+    toast(`${l.length}件をフォルダにまとめました`,'名前をつける',()=>editNodeSheet(S.nodes.get(f.id)))},
+  lselMove:()=>{const l=lselList();if(l.length)moveNodesSheet(l,()=>{S.lsel=null})},
+  lselDelete:async()=>{const l=lselList();S.lsel=null;await deleteNodes(l)},
   seed,
 };
 const lp={t:null,fired:false,x:0,y:0};
 document.addEventListener('click',e=>{
-  if(lp.fired){lp.fired=false;e.preventDefault();e.stopPropagation();return}
+  if(lp.fired||G.suppress){lp.fired=false;G.suppress=false;e.preventDefault();e.stopPropagation();return}
+  if(S.swiped&&!e.target.closest('.acts')){closeSwipe();e.preventDefault();e.stopPropagation();return}
   const el=e.target.closest('[data-act]');if(!el)return;
   ACT[el.dataset.act]&&ACT[el.dataset.act](el,e);
 },true);
 function onLong(it){navigator.vibrate&&navigator.vibrate(8);
-  if(it.dataset.lpm){if(S.sel)selToggle(it.dataset.lpm);else msgMenu(it.dataset.lpm)}else nodeMenu(it.dataset.lp)}
-document.addEventListener('pointerdown',e=>{lp.fired=false;const it=e.target.closest('[data-lp],[data-lpm]');if(!it||e.button>0)return;if(e.target.closest('.mbtn,.more'))return;lp.x=e.clientX;lp.y=e.clientY;clearTimeout(lp.t);lp.t=setTimeout(()=>{lp.t=null;lp.fired=true;onLong(it)},480)});
+  if(S.sel)selToggle(it.dataset.lpm);else selStart(it.dataset.lpm)}
+document.addEventListener('pointerdown',e=>{lp.fired=false;const it=e.target.closest('[data-lpm]');if(!it||e.button>0)return;if(e.target.closest('.mbtn'))return;lp.x=e.clientX;lp.y=e.clientY;clearTimeout(lp.t);lp.t=setTimeout(()=>{lp.t=null;lp.fired=true;onLong(it)},480)});
 document.addEventListener('pointermove',e=>{if(lp.t&&Math.hypot(e.clientX-lp.x,e.clientY-lp.y)>8){clearTimeout(lp.t);lp.t=null}});
 ['pointerup','pointercancel'].forEach(ev=>document.addEventListener(ev,()=>{clearTimeout(lp.t);lp.t=null}));
-document.addEventListener('contextmenu',e=>{const it=e.target.closest('[data-lp],[data-lpm]');if(!it)return;e.preventDefault();if(lp.fired)return;clearTimeout(lp.t);lp.t=null;if(e.pointerType==='touch')lp.fired=true;onLong(it)});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('.lightbox'))$('.lightbox').remove();else if(sheetStack.length)closeSheet();else if(S.sel)selExit();else if(S.roomId&&!matchMedia('(min-width:900px)').matches)closeRoom()}});
+document.addEventListener('contextmenu',e=>{const m=e.target.closest('[data-lpm]'),it=e.target.closest('.iw .item');if(!m&&!it)return;e.preventDefault();
+  if(lastPtype!=='mouse'||lp.fired||D.active)return;clearTimeout(lp.t);lp.t=null;clearTimeout(G.timer);G.el=null;
+  if(m)msgMenu(m.dataset.lpm);else nodeMenu(it.dataset.id)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('.lightbox'))$('.lightbox').remove();else if(sheetStack.length)closeSheet();else if(S.sel)selExit();else if(S.lsel){S.lsel=null;renderList()}else if(S.roomId&&!matchMedia('(min-width:900px)').matches)closeRoom()}});
 $('#fileImg').onchange=e=>{addPending([...e.target.files]);e.target.value=''};
 $('#fileBackup').onchange=e=>{const f=e.target.files[0];if(f)restore(f);e.target.value=''};
+
+/* =========================================================
+   LIST GESTURES：左スワイプ＝操作ボタン / 長押し＝ドラッグ（並べ替え・重ねてフォルダ化・上の階層へ）
+   ========================================================= */
+const ACTW=210;let lastPtype='mouse';
+const lselList=()=>sortNodes(kids(S.cwd)).filter(k=>S.lsel&&S.lsel.has(k.id));
+document.addEventListener('pointerdown',e=>{lastPtype=e.pointerType;G.suppress=false},true);
+const G={el:null,timer:null,suppress:false};
+const D={active:false};
+function hideActs(it){setTimeout(()=>{if(it&&!it.style.transform)it.parentElement?.classList.remove('sw')},260)}
+function closeSwipe(){if(!S.swiped)return;const it=document.querySelector(`.iw[data-nid="${S.swiped}"] > .item`);if(it){it.style.transform='';hideActs(it)}S.swiped=null}
+document.addEventListener('pointerdown',e=>{
+  if(D.active)return;
+  const it=e.target.closest('.iw:not([data-static]) > .item');
+  if(!it||S.lsel||(e.pointerType==='mouse'&&e.button!==0))return;
+  if(e.target.closest('.more'))return;
+  G.el=it;G.id=it.dataset.id;G.x=G.lx=e.clientX;G.y=G.ly=e.clientY;G.mode=null;G.pid=e.pointerId;G.base=S.swiped===G.id?-ACTW:0;G.tx=G.base;
+  clearTimeout(G.timer);G.timer=setTimeout(()=>{if(G.el===it&&!G.mode){G.mode='drag';if(S.swiped)closeSwipe();startDrag()}},420);
+});
+document.addEventListener('pointermove',e=>{
+  if(!G.el||e.pointerId!==G.pid)return;G.lx=e.clientX;G.ly=e.clientY;
+  const dx=e.clientX-G.x,dy=e.clientY-G.y;
+  if(!G.mode&&Math.hypot(dx,dy)>8){clearTimeout(G.timer);
+    if(Math.abs(dx)>Math.abs(dy)*1.2){G.mode='swipe';if(S.swiped&&S.swiped!==G.id)closeSwipe();G.el.parentElement.classList.add('sw');G.el.style.transition='none';try{G.el.setPointerCapture(e.pointerId)}catch(_){}}
+    else G.mode='scroll'}
+  if(G.mode==='swipe'){G.tx=Math.min(20,Math.max(-ACTW-50,G.base+dx));G.el.style.transform=`translateX(${G.tx}px)`}
+  else if(G.mode==='drag')moveDrag(e.clientX,e.clientY);
+});
+function gEnd(e){
+  if(!G.el||e.pointerId!==G.pid)return;clearTimeout(G.timer);
+  const it=G.el,mode=G.mode;G.el=null;
+  if(mode==='swipe'){it.style.transition='';const open=G.tx<-ACTW/2;it.style.transform=open?`translateX(${-ACTW}px)`:'';if(!open)hideActs(it);S.swiped=open?G.id:null;G.suppress=true;setTimeout(()=>G.suppress=false,350)}
+  else if(mode==='drag'){G.suppress=true;setTimeout(()=>G.suppress=false,350);endDrag(e.type==='pointercancel')}
+}
+document.addEventListener('pointerup',gEnd);document.addEventListener('pointercancel',gEnd);
+document.addEventListener('touchmove',e=>{if(G.el&&(G.mode==='drag'||G.mode==='swipe'))e.preventDefault()},{passive:false});
+
+function startDrag(){
+  const it=G.el;const r=it.getBoundingClientRect();
+  Object.assign(D,{active:true,id:G.id,offX:G.x-r.left,offY:G.y-r.top,target:null,hoverKey:null,lx:G.lx,ly:G.ly});
+  const g=it.cloneNode(true);g.classList.add('ghost');g.classList.remove('active','dragging');g.querySelector('.more')?.remove();
+  g.style.width=r.width+'px';g.style.transform='scale(.94)';document.body.appendChild(g);D.ghost=g;
+  it.classList.add('dragging');document.body.classList.add('dragging-on');
+  navigator.vibrate&&navigator.vibrate(12);
+  drawUpbar();posGhost();D.raf=requestAnimationFrame(autoScroll);
+}
+function posGhost(){if(D.ghost){D.ghost.style.left=(D.lx-D.offX)+'px';D.ghost.style.top=(D.ly-D.offY)+'px'}}
+function drawUpbar(){
+  const P=$('#listPane');let ub=$('#upbar');
+  if(!S.cwd){ub&&ub.remove();return}
+  const cur=S.nodes.get(S.cwd);const parent=cur&&cur.parentId?S.nodes.get(cur.parentId):null;
+  if(!ub){ub=document.createElement('div');ub.id='upbar';P.appendChild(ub)}
+  ub.innerHTML=`<span class="arr">←<i></i></span><span>${parent?`「${esc(parent.name)}」`:'ホーム'}へ（上の階層）</span>`;
+}
+function clearMarks(){document.querySelectorAll('.drop-before,.drop-after,.drop-into').forEach(x=>x.classList.remove('drop-before','drop-after','drop-into'));$('#upbar')?.classList.remove('hot')}
+function setHover(key,fn,ms){if(D.hoverKey===key)return;clearTimeout(D.hoverT);D.hoverKey=key;if(key&&fn)D.hoverT=setTimeout(()=>{D.hoverKey=null;fn()},ms)}
+function canInto(dragId,tn){if(tn.id===dragId)return false;if(tn.type==='folder')return !ancestors(tn.id).some(a=>a.id===dragId);return true}
+function moveDrag(x,y){D.lx=x;D.ly=y;posGhost();updateTarget()}
+function updateTarget(){
+  if(!D.active)return;const x=D.lx,y=D.ly;clearMarks();
+  const el=document.elementFromPoint(x,y);
+  if(el&&el.closest('#upbar')){$('#upbar').classList.add('hot');D.target={type:'up'};setHover('up',goUpDrag,700);return}
+  const w=el&&el.closest('.iw');
+  if(w&&w.dataset.nid!==D.id&&!w.dataset.static&&S.nodes.has(w.dataset.nid)){
+    const tn=S.nodes.get(w.dataset.nid);const r=w.getBoundingClientRect();const rel=(y-r.top)/r.height;
+    let zone=rel<.28?'before':rel>.72?'after':'into';if(zone==='into'&&!canInto(D.id,tn))zone=rel<.5?'before':'after';
+    w.classList.add('drop-'+zone);D.target={type:'node',id:tn.id,zone};
+    if(zone==='into'&&tn.type==='folder')setHover('in:'+tn.id,()=>enterDrag(tn.id),1000);else setHover(null);
+    return}
+  if(el&&el.closest('#listScroll')){
+    const ws=[...document.querySelectorAll('#listScroll .iw')].filter(x=>x.dataset.nid!==D.id);const last=ws[ws.length-1];
+    if(!last)D.target={type:'end'};else if(y>last.getBoundingClientRect().bottom){last.classList.add('drop-after');D.target={type:'end'}}else D.target=null;
+    setHover(null);return}
+  D.target=null;setHover(null);
+}
+function rerenderDuringDrag(){renderList();document.querySelector(`.iw[data-nid="${D.id}"] > .item`)?.classList.add('dragging');navigator.vibrate&&navigator.vibrate(8);updateTarget()}
+function goUpDrag(){const c=S.nodes.get(S.cwd);S.cwd=c?.parentId||null;rerenderDuringDrag()}
+function enterDrag(id){S.cwd=id;rerenderDuringDrag()}
+function autoScroll(){
+  if(!D.active)return;const sc=$('#listScroll');
+  if(sc){const r=sc.getBoundingClientRect();const off=0;let v=0;
+    if(D.ly>r.top+off&&D.ly<r.top+off+44)v=-7;else if(D.ly>r.bottom-56&&D.ly<r.bottom+20)v=7;
+    if(v){const b=sc.scrollTop;sc.scrollTop+=v;if(sc.scrollTop!==b)updateTarget()}}
+  D.raf=requestAnimationFrame(autoScroll);
+}
+async function endDrag(cancel){
+  const t=cancel?null:D.target;const n=S.nodes.get(D.id);
+  D.active=false;cancelAnimationFrame(D.raf);clearTimeout(D.hoverT);D.hoverKey=null;D.ghost?.remove();D.ghost=null;clearMarks();$('#upbar')?.remove();document.body.classList.remove('dragging-on');
+  document.querySelectorAll('.item.dragging').forEach(x=>x.classList.remove('dragging'));
+  if(!t||!n){renderList();return}
+  if(t.type==='up'){const c=S.nodes.get(S.cwd);const p=c?.parentId||null;await placeNode(n,p,'top');const pn=S.nodes.get(p);toast(`${pn?`「${pn.name}」`:'ホーム'}へ移動しました`)}
+  else if(t.type==='end')await placeNode(n,S.cwd,'end');
+  else{const tn=S.nodes.get(t.id);if(!tn){renderList();return}
+    if(t.zone==='into'){if(tn.type==='folder'){await placeNode(n,tn.id,'top');toast(`「${tn.name}」に入れました`)}else await stackFolder(n,tn)}
+    else await placeNode(n,tn.parentId||null,{ref:tn.id,after:t.zone==='after'})}
+  renderList();renderRoom(true);
+}
+async function placeNode(n,pid,pos){
+  if(pid&&(pid===n.id||ancestors(pid).some(a=>a.id===n.id)))return;
+  const sibs=sortNodes(kids(pid)).filter(x=>x.id!==n.id);
+  const i=pos==='top'?0:pos==='end'?sibs.length:Math.max(0,sibs.findIndex(x=>x.id===pos.ref))+(pos.after?1:0);
+  sibs.splice(i,0,n);n.parentId=pid;sibs.forEach((x,k)=>x.order=k);await saveNodes(sibs);
+}
+async function stackFolder(a,b){
+  const pid=b.parentId||null;
+  const f={id:uid(),type:'folder',parentId:pid,name:'新しいフォルダ',emoji:'',color:PALETTE[Math.floor(Math.random()*7)],tags:[],createdAt:now(),order:0};
+  const base=sortNodes(kids(pid)).filter(x=>x.id!==a.id);const bi=base.findIndex(x=>x.id===b.id);
+  const sibs=base.filter(x=>x.id!==b.id);sibs.splice(Math.max(0,bi),0,f);sibs.forEach((x,k)=>x.order=k);
+  b.parentId=f.id;b.order=0;a.parentId=f.id;a.order=1;
+  await saveNodes([...sibs,a,b]);
+  toast('フォルダにまとめました','名前をつける',()=>editNodeSheet(S.nodes.get(f.id)));
+}
 
 /* sample */
 async function seed(){
@@ -1119,13 +1366,15 @@ async function seed(){
   await saveMsgs(list);for(const n of [r1,r2,r3])await saveNode(n);
   const p={id:uid(),name:'AIに渡す',F:{scope:[f1.id],tagIn:[],tagOut:[],status:'new',expr:'',from:'',to:''},O:{inc:{date:true,time:false,folder:false,room:true,tags:false,images:true},mode:'group',tagMode:'any'},createdAt:t};
   S.presets.set(p.id,p);await DB.put('presets',p);
-  renderList();
+  await normalizeOrders();renderList();
 }
 
 (async()=>{
   await DB.open();
   const [n,m,x,p]=await Promise.all(['nodes','messages','exports','presets'].map(s=>DB.all(s)));
-  n.forEach(v=>S.nodes.set(v.id,v));m.forEach(v=>S.msgs.set(v.id,v));x.forEach(v=>S.exports.set(v.id,v));p.forEach(v=>S.presets.set(v.id,v));bump();
+  n.forEach(v=>(v.deletedAt?S.tnodes:S.nodes).set(v.id,v));m.forEach(v=>(v.deletedAt?S.tmsgs:S.msgs).set(v.id,v));x.forEach(v=>S.exports.set(v.id,v));p.forEach(v=>S.presets.set(v.id,v));bump();
+  await purgeTrash(x=>x.deletedAt<now()-90*86400000);
+  await normalizeOrders();
   renderList();renderRoom();
 })();
 </script>
