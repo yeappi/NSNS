@@ -1500,27 +1500,40 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <script>
-/* iOS PWA visual viewport handling. Only adjust while the software keyboard is visible. */
+/* iOS キーボード対応（LINE方式）
+   - キーボードが出たら、アプリ全体を「見えている範囲」にぴったり合わせる（ヘッダーは上に残る）
+   - トークの中身は、下端に揃っていたら下端のまま／中身が少なくて余白があるなら動かさない
+   - 判定は「画面の高さ − 見えている高さ」で行う。iOSが画面をずらした量(offsetTop)を引くと、
+     ずらされた時だけ「キーボードなし」と誤判定してしまうため引かない */
 (function(){
-  const app=document.getElementById('app'), vv=window.visualViewport;
+  const app=document.getElementById('app'),vv=window.visualViewport;
   if(!app||!vv)return;
-  let raf=0;
+  let raf=0,wasKb=false;
+  const anchors=[];
+  function snapshot(){ // 変化前に「下端からの距離」を覚える
+    anchors.length=0;
+    document.querySelectorAll('#chat').forEach(c=>anchors.push([c,c.scrollHeight-c.scrollTop-c.clientHeight]));
+  }
   function update(){
     raf=0;
-    const focused=document.activeElement;
-    const typing=!!focused&&/^(INPUT|TEXTAREA)$/.test(focused.tagName);
-    const covered=window.innerHeight-vv.height-vv.offsetTop;
-    const keyboardVisible=typing&&covered>120;
-    if(keyboardVisible){
-      // Anchor to the actual visible region rather than scrolling the whole document.
-      const top=window.scrollY+vv.offsetTop;
-      app.style.setProperty('--kb-top',Math.round(top)+'px');
+    const a=document.activeElement;
+    const typing=!!a&&/^(INPUT|TEXTAREA)$/.test(a.tagName);
+    const kb=typing&&(window.innerHeight-vv.height)>120;
+    snapshot();
+    if(kb){
+      app.style.setProperty('--kb-top',Math.round(window.scrollY+vv.offsetTop)+'px');
       app.style.setProperty('--kb-height',Math.round(vv.height)+'px');
       app.classList.add('keyboard-visible');
     }else{
       app.classList.remove('keyboard-visible');
-      app.style.removeProperty('--kb-top');
-      app.style.removeProperty('--kb-height');
+      app.style.removeProperty('--kb-top');app.style.removeProperty('--kb-height');
+      if(wasKb&&(window.scrollY||vv.offsetTop))window.scrollTo(0,0); // iOSがずらしたままの分を戻す
+    }
+    wasKb=kb;
+    // 中身があふれている時だけ、下端からの距離を保つ（あふれていなければ scrollTop は0のまま＝動かない）
+    for(const [c,fromBottom] of anchors){
+      const max=c.scrollHeight-c.clientHeight;
+      if(max>0)c.scrollTop=Math.max(0,max-Math.max(0,fromBottom));
     }
   }
   function schedule(){if(!raf)raf=requestAnimationFrame(update)}
