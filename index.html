@@ -36,6 +36,9 @@ html{-webkit-text-size-adjust:100%}
 
 /* layout */
 #app{display:grid;grid-template-columns:1fr;height:100dvh;max-width:1240px;margin:0 auto;overflow:hidden}
+/* iOS keyboard: keep app aligned with the visual viewport without locking body or input focus. */
+#app.keyboard-visible{position:absolute;top:var(--kb-top,0px);left:0;right:0;width:100%;height:var(--kb-height,100dvh)}
+#app.keyboard-visible .composer{padding-bottom:8px}
 .pane{display:flex;flex-direction:column;min-height:0;min-width:0;height:100%;overflow:hidden}
 #listPane{position:relative}
 #roomPane{display:none;background:var(--chat)}
@@ -1397,6 +1400,40 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js', {scope: '/'}).catch(err => console.warn('NSNS PWA:', err));
   });
 }
+</script>
+<script>
+/* iOS PWA visual viewport handling. Only adjust while the software keyboard is visible. */
+(function(){
+  const app=document.getElementById('app'), vv=window.visualViewport;
+  if(!app||!vv)return;
+  let raf=0;
+  function update(){
+    raf=0;
+    const focused=document.activeElement;
+    const typing=!!focused&&/^(INPUT|TEXTAREA)$/.test(focused.tagName);
+    const covered=window.innerHeight-vv.height-vv.offsetTop;
+    const keyboardVisible=typing&&covered>120;
+    if(keyboardVisible){
+      // Anchor to the actual visible region rather than scrolling the whole document.
+      const top=window.scrollY+vv.offsetTop;
+      app.style.setProperty('--kb-top',Math.round(top)+'px');
+      app.style.setProperty('--kb-height',Math.round(vv.height)+'px');
+      app.classList.add('keyboard-visible');
+    }else{
+      app.classList.remove('keyboard-visible');
+      app.style.removeProperty('--kb-top');
+      app.style.removeProperty('--kb-height');
+    }
+  }
+  function schedule(){if(!raf)raf=requestAnimationFrame(update)}
+  vv.addEventListener('resize',schedule);
+  vv.addEventListener('scroll',schedule);
+  window.addEventListener('scroll',schedule,{passive:true});
+  window.addEventListener('resize',schedule);
+  document.addEventListener('focusin',schedule);
+  document.addEventListener('focusout',()=>requestAnimationFrame(schedule));
+  schedule();
+})();
 </script>
 </body>
 </html>
