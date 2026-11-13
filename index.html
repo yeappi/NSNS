@@ -199,9 +199,9 @@ body.dragging-on,body.dragging-on *{cursor:grabbing!important}
 .roomempty .logo{font-size:44px;font-weight:700;letter-spacing:.1em;color:#E6DED5}
 
 /* sheets */
-.backdrop{position:fixed;inset:0;background:rgba(40,30,20,.28);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fade .18s}
-.sheet{background:var(--bg);width:100%;max-width:560px;max-height:92dvh;border-radius:26px 26px 0 0;padding:8px 18px calc(18px + var(--safe-b));overflow-y:auto;animation:up .24s cubic-bezier(.2,.8,.2,1);position:relative}
-@media (min-width:700px){.backdrop{align-items:center}.sheet{border-radius:26px;max-height:88dvh}}
+.backdrop{position:fixed;top:var(--vv-top,0px);left:0;right:0;height:var(--vv-height,100dvh);background:rgba(40,30,20,.28);z-index:50;display:flex;align-items:flex-end;justify-content:center;animation:fade .18s}
+.sheet{background:var(--bg);width:100%;max-width:560px;max-height:calc(var(--vv-height,100dvh) * .92);border-radius:26px 26px 0 0;padding:8px 18px calc(18px + var(--safe-b));overflow-y:auto;animation:up .24s cubic-bezier(.2,.8,.2,1);position:relative}
+@media (min-width:700px){.backdrop{align-items:center}.sheet{border-radius:26px;max-height:calc(var(--vv-height,100dvh) * .88)}}
 .sheet.full{max-width:820px}
 .grab{width:38px;height:4px;border-radius:2px;background:#E2DBD3;margin:4px auto 12px}
 .sheet h3{margin:4px 2px 14px;font-size:17px}
@@ -230,7 +230,21 @@ textarea.inp{resize:vertical;min-height:120px;line-height:1.6}
 .emo button{height:38px;border-radius:11px;font-size:19px;display:grid;place-items:center}
 .emo button:hover{background:rgba(0,0,0,.04)}
 .emo button.on{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
-.emo button.letter{font-size:14px;font-weight:700;color:var(--sub)}
+.av.ph img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;position:relative}
+.avbtn{padding:0;border-radius:18px;position:relative;flex:none}
+.avbtn::after{content:"📷";position:absolute;right:-5px;bottom:-5px;font-size:11px;background:#fff;border-radius:50%;width:22px;height:22px;display:grid;place-items:center;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.iconmodes{display:flex;gap:6px}
+.iconmodes button{flex:1;height:42px;border-radius:13px;background:#F1EDE7;font-size:13px;color:#6E675F;display:flex;align-items:center;justify-content:center;gap:6px;min-width:0}
+.iconmodes button .e{font-size:17px}
+.iconmodes button.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:500;box-shadow:inset 0 0 0 1.5px var(--accent)}
+.iconmodes .chev{font-size:9px;transition:transform .15s;opacity:.7}
+.iconmodes button.open .chev{transform:rotate(180deg)}
+.emopanel{margin-top:8px;padding:10px;background:var(--card);border-radius:16px;box-shadow:var(--shadow);animation:pop .16s ease-out}
+@keyframes pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.emopanel .inp{margin-top:8px;padding:8px 12px}
+.phrow{display:flex;align-items:center;gap:12px;margin-top:8px;font-size:12.5px;color:var(--sub);padding:0 4px}
+.phrow span{flex:1}
+.phrow button{color:var(--accent-ink);font-size:12.5px;font-weight:500}
 .tagbox{display:flex;flex-wrap:wrap;gap:6px;align-items:center;border:1.5px solid var(--line);background:var(--card);border-radius:14px;padding:8px 10px;min-height:46px}
 .tagbox input{border:0;outline:none;flex:1;min-width:90px;background:none}
 .sugs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
@@ -470,7 +484,7 @@ async function restoreTrash(tid){
 async function purgeTrash(pred){
   const ms=[...S.tmsgs.values()].filter(pred),ns=[...S.tnodes.values()].filter(pred);
   for(const m of ms){for(const b of m.images||[])await DB.del('blobs',b);await DB.del('messages',m.id);S.tmsgs.delete(m.id)}
-  for(const n of ns){await DB.del('nodes',n.id);S.tnodes.delete(n.id)}
+  for(const n of ns){if(n.photo)await DB.del('blobs',n.photo);await DB.del('nodes',n.id);S.tnodes.delete(n.id)}
 }
 function trashGroups(){const g=new Map();const add=(x,k)=>{let b=g.get(x.trashId);if(!b)g.set(x.trashId,b={id:x.trashId,at:x.deletedAt,nodes:[],msgs:[]});b[k].push(x)};
   S.tnodes.forEach(n=>add(n,'nodes'));S.tmsgs.forEach(m=>add(m,'msgs'));return [...g.values()].sort((a,b)=>b.at-a.at)}
@@ -494,14 +508,24 @@ async function blobURL(id){if(S.urls.has(id))return S.urls.get(id);const r=await
 function hydrate(root){root.querySelectorAll('img[data-blob]').forEach(async img=>{if(img.getAttribute('src'))return;img.src=await blobURL(img.dataset.blob)})}
 
 /* ---------------- avatar ---------------- */
-function avatar(n,sm){
+function avatar(n,sm,photoUrl){
   const bg=colorOf(n);const cls='av'+(sm?' sm':'')+(n.type==='folder'?' folder':'');
+  const url=photoUrl||(n.photo&&S.urls.get(n.photo));
+  if(url)return `<div class="${cls} ph" style="background:${bg}"><img src="${url}" alt=""></div>`;
   let inner;
   if(n.emoji)inner=esc(n.emoji);
   else if(n.type==='folder'){const ks=sortNodes(kids(n.id)).slice(0,4);inner='<div class="grid">'+[0,1,2,3].map(i=>`<i style="${ks[i]?'background:'+colorOf(ks[i])+';filter:saturate(1.4) brightness(.97)':''}"></i>`).join('')+'</div>'}
   else inner=esc([...(n.name||'？')][0]);
   return `<div class="${cls}" style="background:${bg}">${inner}</div>`;
 }
+async function loadPhotos(){await Promise.all([...S.nodes.values(),...S.tnodes.values()].filter(n=>n.photo).map(n=>blobURL(n.photo).catch(()=>'')))}
+async function cropSquare(file,size=320){
+  const bmp=await createImageBitmap(file);const s=Math.min(bmp.width,bmp.height);
+  const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,size,size);
+  x.drawImage(bmp,(bmp.width-s)/2,(bmp.height-s)/2,s,s,0,0,size,size);
+  return await new Promise(r=>c.toBlob(r,'image/jpeg',.88));
+}
+function firstGrapheme(v){v=(v||'').trim();if(!v)return '';try{if(window.Intl&&Intl.Segmenter){const it=new Intl.Segmenter('ja',{granularity:'grapheme'}).segment(v)[Symbol.iterator]().next();return it.value?it.value.segment:''}}catch(e){}return [...v].slice(0,2).join('')}
 
 /* =========================================================
    LIST PANE
@@ -742,31 +766,55 @@ function tagEditor(container,initial){
 
 /* node edit / create */
 function editNodeSheet(n,isNew){
-  let color=n.color||colorOf(n),emoji=n.emoji||'',badge=!!n.badge;
+  let color=n.color||colorOf(n),emoji=n.emoji||'',badge=!!n.badge,photo=n.photo||null,photoBlob=null,photoUrl=null,emoOpen=false;
   const isRoom=n.type==='room';
   const sh=openSheet(`<h3>${isNew?(isRoom?'新しいトーク':'新しいフォルダ'):(isRoom?'トークを編集':'フォルダを編集')}</h3>
-    <div class="field" style="display:flex;gap:12px;align-items:center">
-      <div id="fPrev"></div><input class="inp" id="fName" value="${esc(n.name)}" placeholder="${isRoom?'例：思考の叩き出し':'例：アイデア'}" style="flex:1">
+    <div class="field" style="display:flex;gap:14px;align-items:center">
+      <button class="avbtn" id="fPrev" title="写真を選ぶ"></button><input class="inp" id="fName" value="${esc(n.name)}" placeholder="${isRoom?'例：思考の叩き出し':'例：アイデア'}" style="flex:1">
     </div>
-    <div class="field"><span class="flabel">アイコン</span><div class="emo"><button class="letter" data-e="">あ</button>${EMOJIS.map(e=>`<button data-e="${e}">${e}</button>`).join('')}</div></div>
+    <div class="field"><span class="flabel">アイコン</span>
+      <div class="iconmodes"><button data-m="letter"><span class="e" style="font-size:14px;font-weight:700">あ</span>文字</button><button data-m="emoji"><span class="e" id="fEmoCur">😀</span>絵文字<span class="chev">▼</span></button><button data-m="photo"><span class="e">📷</span>写真</button></div>
+      <div class="emopanel hidden" id="fEmoPanel"><div class="emo">${EMOJIS.map(e=>`<button data-e="${e}">${e}</button>`).join('')}</div><input class="inp" id="fEmoIn" placeholder="ほかの絵文字はここに入力"></div>
+      <div class="phrow hidden" id="fPhRow"><span>写真をアイコンにしています</span><button data-x="phchg">変更</button><button data-x="phrm">外す</button></div>
+      <input type="file" accept="image/*" class="hidden" id="fPhoto">
+    </div>
     <div class="field"><span class="flabel">色</span><div class="swatches">${PALETTE.map(c=>`<button data-c="${c}" style="background:${c}"></button>`).join('')}</div></div>
     <div class="field"><span class="flabel">タグ${isRoom?'':'（中のトークすべてに効きます）'}</span><div id="fTags"></div></div>
     ${isRoom?`<div class="swrow" id="fBadge"><div class="t">未書き出しの数をバッジで出す<small>AIに渡すために溜めるトーク向け。日記などはオフがおすすめ</small></div><div class="switch"></div></div>`:''}
     <div class="btns"><button class="btn" data-x="no">やめる</button><button class="btn pri" data-x="ok">${isNew?'つくる':'保存'}</button></div>`);
-  const nm=sh.querySelector('#fName');
-  const drawPrev=()=>{sh.querySelector('#fPrev').innerHTML=avatar({...n,name:nm.value||n.name||'？',color,emoji},false);
-    sh.querySelectorAll('[data-e]').forEach(b=>b.classList.toggle('on',b.dataset.e===emoji));
+  const q=x=>sh.querySelector(x);const nm=q('#fName');
+  const mode=()=>(photoBlob||photo)?'photo':emoji?'emoji':'letter';
+  const draw=()=>{
+    q('#fPrev').innerHTML=avatar({...n,name:nm.value||n.name||'？',color,emoji,photo:photoBlob?null:photo},false,photoBlob?photoUrl:null);
+    const m=mode();sh.querySelectorAll('[data-m]').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+    q('[data-m=emoji]').classList.toggle('open',emoOpen);q('#fEmoCur').textContent=emoji||'😀';
+    q('#fEmoPanel').classList.toggle('hidden',!emoOpen);q('#fPhRow').classList.toggle('hidden',m!=='photo');
+    sh.querySelectorAll('[data-e]').forEach(b=>b.classList.toggle('on',b.dataset.e===emoji&&m==='emoji'));
     sh.querySelectorAll('[data-c]').forEach(b=>b.classList.toggle('on',b.dataset.c===color));
-    const bs=sh.querySelector('#fBadge .switch');if(bs)bs.classList.toggle('on',badge)};
-  drawPrev();nm.addEventListener('input',drawPrev);
-  const getTags=tagEditor(sh.querySelector('#fTags'),n.tags||[]);
-  sh.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{emoji=b.dataset.e;drawPrev()});
-  sh.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{color=b.dataset.c;drawPrev()});
-  const fb=sh.querySelector('#fBadge');if(fb)fb.onclick=()=>{badge=!badge;drawPrev()};
+    const bs=q('#fBadge .switch');if(bs)bs.classList.toggle('on',badge)};
+  draw();nm.addEventListener('input',draw);
+  const getTags=tagEditor(q('#fTags'),n.tags||[]);
+  const pick=()=>q('#fPhoto').click();
+  const setEmoji=e=>{if(!e)return;emoji=e;photo=null;photoBlob=null;emoOpen=false;draw()};
+  q('[data-m=letter]').onclick=()=>{emoji='';photo=null;photoBlob=null;emoOpen=false;draw()};
+  q('[data-m=emoji]').onclick=()=>{emoOpen=!emoOpen;draw();if(emoOpen)q('#fEmoPanel').scrollIntoView({block:'nearest',behavior:'smooth'})};
+  q('[data-m=photo]').onclick=pick;q('#fPrev').onclick=pick;q('[data-x=phchg]').onclick=pick;
+  q('[data-x=phrm]').onclick=()=>{photo=null;photoBlob=null;draw()};
+  q('#fPhoto').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+    try{photoBlob=await cropSquare(f);photoUrl=URL.createObjectURL(photoBlob);emoji='';emoOpen=false;draw()}catch(err){toast('この画像は読み込めませんでした')}};
+  sh.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>setEmoji(b.dataset.e));
+  const ei=q('#fEmoIn');
+  ei.addEventListener('input',e=>{if(e.isComposing)return;const g=firstGrapheme(ei.value);if(g&&!/^[\p{L}\p{N}]$/u.test(g)){setEmoji(g);ei.value=''}});
+  ei.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){e.preventDefault();setEmoji(firstGrapheme(ei.value));ei.value=''}});
+  sh.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{color=b.dataset.c;draw()});
+  const fb=q('#fBadge');if(fb)fb.onclick=()=>{badge=!badge;draw()};
   if(!isTouch()||isNew)setTimeout(()=>{nm.focus();if(!isNew)nm.select()},60);
-  nm.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229)sh.querySelector('[data-x=ok]').click()});
-  sh.querySelector('[data-x=no]').onclick=()=>closeSheet();
-  sh.querySelector('[data-x=ok]').onclick=async()=>{
+  nm.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229)q('[data-x=ok]').click()});
+  q('[data-x=no]').onclick=()=>closeSheet();
+  q('[data-x=ok]').onclick=async()=>{
+    const old=n.photo||null;
+    if(photoBlob){const id=uid();await DB.put('blobs',{id,blob:photoBlob});S.urls.set(id,photoUrl);n.photo=id}else n.photo=photo;
+    if(old&&old!==n.photo)await DB.del('blobs',old);
     n.name=nm.value.trim()||(isRoom?'無題のトーク':'無題のフォルダ');n.emoji=emoji;n.color=color;n.tags=getTags();if(isRoom)n.badge=badge;
     await saveNode(n);closeSheet();
     if(isNew){hintOnce('nodeLP','左にスワイプで編集・削除、長押しで並べ替えできます');if(isRoom)openRoom(n.id);else{S.cwd=n.id;renderList()}}
@@ -1157,7 +1205,8 @@ function settings(){
 async function backup(){
   toast('バックアップを作っています…');
   const toB64=b=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b)});
-  const blobs=[];for(const m of S.msgs.values())for(const id of m.images||[]){const r=await DB.get('blobs',id);if(r)blobs.push({id,data:await toB64(r.blob)})}
+  const blobs=[];const ids=new Set();[...S.msgs.values(),...S.tmsgs.values()].forEach(m=>(m.images||[]).forEach(i=>ids.add(i)));[...S.nodes.values(),...S.tnodes.values()].forEach(n=>n.photo&&ids.add(n.photo));
+  for(const id of ids){const r=await DB.get('blobs',id);if(r)blobs.push({id,data:await toB64(r.blob)})}
   const data={app:'NSNS',version:2,at:now(),nodes:[...S.nodes.values(),...S.tnodes.values()],messages:[...S.msgs.values(),...S.tmsgs.values()].map(({_tags,...m})=>m),blobs,exports:[...S.exports.values()],presets:[...S.presets.values()]};
   if(await download(new Blob([JSON.stringify(data)],{type:'application/json'}),`NSNS_backup_${ymd(now())}.json`)){LS.set('lastBackup',now());fillListBody()}
 }
@@ -1169,6 +1218,7 @@ async function restore(file){
     for(const b of d.blobs||[])await DB.put('blobs',{id:b.id,blob:dataURLtoBlob(b.data)});
     for(const n of d.nodes)(n.deletedAt?S.tnodes:S.nodes).set(n.id,n);await DB.putMany('nodes',d.nodes);
     for(const m of d.messages)(m.deletedAt?S.tmsgs:S.msgs).set(m.id,m);await DB.putMany('messages',d.messages);
+    await loadPhotos();
     for(const x of d.exports||[])S.exports.set(x.id,x);await DB.putMany('exports',d.exports||[]);
     for(const x of d.presets||[])S.presets.set(x.id,x);await DB.putMany('presets',d.presets||[]);
     bump();await normalizeOrders();renderList();renderRoom();toast('読み込みました');
@@ -1387,6 +1437,7 @@ async function seed(){
   n.forEach(v=>(v.deletedAt?S.tnodes:S.nodes).set(v.id,v));m.forEach(v=>(v.deletedAt?S.tmsgs:S.msgs).set(v.id,v));x.forEach(v=>S.exports.set(v.id,v));p.forEach(v=>S.presets.set(v.id,v));bump();
   await purgeTrash(x=>x.deletedAt<now()-90*86400000);
   await normalizeOrders();
+  await loadPhotos();
   renderList();renderRoom();
 })();
 </script>
