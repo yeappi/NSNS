@@ -397,6 +397,24 @@ const ago=t=>{const d=Math.floor((now()-t)/86400000);return d<=0?'今日':d===1?
 const LS={get(k,d){try{const v=localStorage.getItem('nsns:'+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem('nsns:'+k,JSON.stringify(v))}catch(e){}}};
 const inFrame=(()=>{try{return window.self!==window.top}catch(e){return true}})();
 const isTouch=()=>matchMedia('(pointer:coarse)').matches;
+/* iOS（特にホーム画面版）は、タップの処理中に同期で呼んだfocus()でしかキーボードを出さない。
+   遅延して呼ぶと「フォーカスは当たっているのにキーボードが出ない」状態になり、その後タップしても出なくなる。 */
+function autoFocus(el,select){
+  if(!el)return;
+  if(isTouch()){try{el.focus({preventScroll:true});if(select)el.select()}catch(e){}return}
+  setTimeout(()=>{el.focus();if(select)el.select()},60);
+}
+/* 保険：フォーカス済みなのにキーボードが出ていない入力欄をタップしたら、いったん外して当て直す */
+document.addEventListener('touchend',e=>{
+  const t=e.target;if(!t||!t.matches||!t.matches('input:not([type=file]):not([type=date]):not([type=datetime-local]),textarea'))return;
+  if(document.activeElement!==t)return;
+  const vv=window.visualViewport;const kb=vv&&(window.innerHeight-vv.height)>120;
+  if(!kb){t.blur();t.focus()}
+},{passive:true});
+/* iOSホーム画面版：キーボードを出したままアプリを離れると、戻ったあと入力できなくなる不具合への対策 */
+const blurActive=()=>{const a=document.activeElement;if(a&&/^(INPUT|TEXTAREA)$/.test(a.tagName))a.blur()};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)blurActive()});
+window.addEventListener('pagehide',blurActive);
 
 let toastTimer;
 function toast(msg,actLabel,act){const t=$('#toast');t.innerHTML=`<span>${esc(msg)}</span>`+(actLabel?`<button>${esc(actLabel)}</button>`:'');
@@ -710,7 +728,7 @@ async function sendMsg(){
   const ids=[];for(const p of S.pending){const id=uid();await DB.put('blobs',{id,blob:p.blob});S.urls.set(id,p.url);ids.push(id)}
   const m={id:uid(),roomId:S.roomId,text:text.trim()?text:'',images:ids,createdAt:now(),exportedAt:null,exportId:null};
   await saveMsg(m);const r=S.nodes.get(S.roomId);r.lastAt=m.createdAt;await saveNode(r);
-  S.pending=[];ta.value='';LS.set('draft:'+r.id,'');autoGrow(ta);renderPending();renderChat(true);renderList();ta.focus();
+  S.pending=[];ta.value='';LS.set('draft:'+r.id,'');autoGrow(ta);renderPending();renderChat(true);renderList();if(!isTouch())ta.focus();
   if(roomMsgs(r.id).length===1)hintOnce('msgLP','メモは長押しで選択して、まとめて書き出せます');
 }
 
@@ -738,7 +756,7 @@ function confirmSheet(title,body,ok='OK',danger){return new Promise(res=>{
 })}
 function promptSheet(title,value,placeholder,ok='OK'){return new Promise(res=>{
   const sh=openSheet(`<h3>${esc(title)}</h3><div class="field"><input class="inp" value="${esc(value||'')}" placeholder="${esc(placeholder||'')}"></div><div class="btns"><button class="btn" data-x="no">やめる</button><button class="btn pri" data-x="ok">${esc(ok)}</button></div>`);
-  const inp=sh.querySelector('input');setTimeout(()=>{inp.focus();inp.select()},60);
+  const inp=sh.querySelector('input');autoFocus(inp,true);
   const done=v=>{closeSheet();res(v)};
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229)done(inp.value.trim())});
   sh.querySelector('[data-x=no]').onclick=()=>done(null);sh.querySelector('[data-x=ok]').onclick=()=>done(inp.value.trim());
@@ -811,7 +829,7 @@ function editNodeSheet(n,isNew){
   ei.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){e.preventDefault();setEmoji(firstGrapheme(ei.value));ei.value=''}});
   sh.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{color=b.dataset.c;draw()});
   const fb=q('#fBadge');if(fb)fb.onclick=()=>{badge=!badge;draw()};
-  if(!isTouch()||isNew)setTimeout(()=>{nm.focus();if(!isNew)nm.select()},60);
+  if(!isTouch())autoFocus(nm,!isNew);else if(isNew)autoFocus(nm);
   nm.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229)q('[data-x=ok]').click()});
   q('[data-x=no]').onclick=()=>closeSheet();
   q('[data-x=ok]').onclick=async()=>{
@@ -1282,7 +1300,7 @@ const ACT={
 const lp={t:null,fired:false,x:0,y:0};
 document.addEventListener('click',e=>{
   if(lp.fired||G.suppress){lp.fired=false;G.suppress=false;e.preventDefault();e.stopPropagation();return}
-  if(S.swiped&&!e.target.closest('.acts')){closeSwipe();e.preventDefault();e.stopPropagation();return}
+  if(S.swiped&&!e.target.closest('.acts,input,textarea')){closeSwipe();e.preventDefault();e.stopPropagation();return}
   const el=e.target.closest('[data-act]');if(!el)return;
   ACT[el.dataset.act]&&ACT[el.dataset.act](el,e);
 },true);
