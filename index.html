@@ -37,7 +37,7 @@ html{-webkit-text-size-adjust:100%}
 /* layout */
 #app{display:grid;grid-template-columns:1fr;height:100dvh;max-width:1240px;margin:0 auto;overflow:hidden}
 /* iOS keyboard: keep app aligned with the visual viewport without locking body or input focus. */
-#app.keyboard-visible{position:absolute;top:var(--kb-top,0px);left:0;right:0;width:100%;height:var(--kb-height,100dvh)}
+#app.keyboard-visible{position:fixed;top:var(--kb-top,0px);left:0;right:0;width:100%;height:var(--kb-height,100dvh)}
 #app.keyboard-visible .composer{padding-bottom:8px}
 .pane{display:flex;flex-direction:column;min-height:0;min-width:0;height:100%;overflow:hidden}
 #listPane{position:relative}
@@ -1402,35 +1402,86 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <script>
-/* iOS PWA visual viewport handling. Only adjust while the software keyboard is visible. */
+/* iOS PWA: resize only the chat's available area, not the document.
+   Do not force short conversations to scroll upward on keyboard focus. */
 (function(){
-  const app=document.getElementById('app'), vv=window.visualViewport;
+  const app=document.getElementById('app');
+  const vv=window.visualViewport;
   if(!app||!vv)return;
   let raf=0;
+  let keyboardWasOpen=false;
+  let focusSnapshot=null;
+  let anchorToBottom=false;
+  let anchorRoom=null;
+
+  function chatElement(){
+    return document.body.classList.contains('in-room')?
+      document.getElementById('chat'):null;
+  }
+  function snapshotBeforeKeyboard(){
+    const chat=chatElement();
+    if(!chat)return null;
+    const max=Math.max(0,chat.scrollHeight-chat.clientHeight);
+    return {
+      element:chat,
+      top:chat.scrollTop,
+      bottom:max-chat.scrollTop<=24
+    };
+  }
   function update(){
     raf=0;
     const focused=document.activeElement;
     const typing=!!focused&&/^(INPUT|TEXTAREA)$/.test(focused.tagName);
     const covered=window.innerHeight-vv.height-vv.offsetTop;
-    const keyboardVisible=typing&&covered>120;
-    if(keyboardVisible){
-      // Anchor to the actual visible region rather than scrolling the whole document.
-      const top=window.scrollY+vv.offsetTop;
-      app.style.setProperty('--kb-top',Math.round(top)+'px');
+    const open=typing&&covered>120;
+    const chat=chatElement();
+    if(open){
+      if(!keyboardWasOpen || chat!==anchorRoom){
+        const snapshot=focusSnapshot&&focusSnapshot.element===chat?
+          focusSnapshot:snapshotBeforeKeyboard();
+        anchorToBottom=!!snapshot?.bottom;
+        anchorRoom=chat;
+      }
+      // A fixed app is anchored to the visual viewport, so iOS's document
+      // auto-scroll cannot push the header offscreen.
+      app.style.setProperty('--kb-top',Math.round(vv.offsetTop)+'px');
       app.style.setProperty('--kb-height',Math.round(vv.height)+'px');
       app.classList.add('keyboard-visible');
+      if(chat){
+        // Wait until the flexbox chat area has its new smaller height.
+        requestAnimationFrame(()=>{
+          if(chat!==chatElement()||!app.classList.contains('keyboard-visible'))return;
+          const max=Math.max(0,chat.scrollHeight-chat.clientHeight);
+          if(max<=1){
+            chat.scrollTop=0;
+          }else if(anchorToBottom){
+            // Keep the latest message visible only to the extent it overflows.
+            chat.scrollTop=max;
+          }
+          // If the user was reading older messages, leave that position alone.
+        });
+      }
     }else{
       app.classList.remove('keyboard-visible');
       app.style.removeProperty('--kb-top');
       app.style.removeProperty('--kb-height');
+      if(keyboardWasOpen){
+        anchorRoom=null;
+        anchorToBottom=false;
+      }
     }
+    keyboardWasOpen=open;
+    if(!open)focusSnapshot=null;
   }
   function schedule(){if(!raf)raf=requestAnimationFrame(update)}
   vv.addEventListener('resize',schedule);
   vv.addEventListener('scroll',schedule);
-  window.addEventListener('scroll',schedule,{passive:true});
   window.addEventListener('resize',schedule);
-  document.addEventListener('focusin',schedule);
+  // Snapshot before the keyboard animation changes the chat height.
+  document.addEventListener('focusin',e=>{
+    if(e.target?.id==='ta')focusSnapshot=snapshotBeforeKeyboard();
+    schedule();
+  });
   document.addEventListener('focusout',()=>requestAnimationFrame(schedule));
   schedule();
 })();
