@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>NSNS</title>
 <meta name="theme-color" content="#FBF9F6">
 <meta name="application-name" content="NSNS">
@@ -26,15 +26,17 @@
   --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--ink)}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none;background:var(--bg);color:var(--ink)}
+html{-webkit-text-size-adjust:100%;touch-action:pan-x pan-y}
+body{position:fixed;inset:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
 body{font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
-input,textarea{font:inherit;color:inherit}
+input,textarea{font:inherit;color:inherit;font-size:16px}
 .hidden{display:none!important}
 
 /* layout */
-#app{display:grid;grid-template-columns:1fr;height:100dvh;max-width:1240px;margin:0 auto}
-.pane{display:flex;flex-direction:column;min-height:0;min-width:0;height:100dvh}
+#app{position:fixed;top:var(--vv-top,0px);left:0;right:0;display:grid;grid-template-columns:1fr;height:var(--vv-height,100dvh);max-width:1240px;margin:0 auto;overflow:hidden}
+.pane{display:flex;flex-direction:column;min-height:0;min-width:0;height:100%;overflow:hidden}
 #listPane{position:relative}
 #roomPane{display:none;background:var(--chat)}
 body.in-room #listPane{display:none}
@@ -47,7 +49,7 @@ body.in-room #roomPane{display:flex}
 }
 
 /* top bar */
-.top{display:flex;align-items:center;gap:4px;padding:calc(10px + var(--safe-t)) 12px 10px;min-height:60px;flex:none}
+.top{display:flex;align-items:center;gap:4px;padding:calc(10px + var(--safe-t)) 12px 10px;min-height:60px;flex:none;position:relative;z-index:2}
 .brand{font-weight:700;font-size:20px;letter-spacing:.06em;flex:1;display:flex;align-items:baseline;gap:8px;padding-left:4px}
 .brand small{font-size:11px;color:var(--sub);font-weight:500;letter-spacing:.08em}
 .icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;color:var(--ink);flex:none;transition:background .15s}
@@ -65,7 +67,7 @@ body.in-room #roomPane{display:flex}
 .searchbox svg{width:17px;height:17px;stroke:var(--sub);fill:none;stroke-width:2}
 
 /* list */
-.scroll{flex:1;overflow-y:auto;min-height:0;overscroll-behavior:contain}
+.scroll{flex:1;overflow-y:auto;min-height:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .list{list-style:none;margin:0;padding:2px 8px 120px}
 .iw{position:relative;border-radius:16px;overflow:hidden;margin:1px 0}
 .iw .acts{position:absolute;right:0;top:0;bottom:0;display:flex;visibility:hidden}
@@ -140,7 +142,7 @@ body.dragging-on,body.dragging-on *{cursor:grabbing!important}
 
 /* room */
 #roomPane .top{background:rgba(245,241,236,.94);backdrop-filter:blur(10px)}
-.chat{flex:1;overflow-y:auto;min-height:0;padding:6px 16px 16px;overscroll-behavior:contain}
+.chat{flex:1;overflow-y:auto;min-height:0;padding:6px 16px 16px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .loadmore{text-align:center;margin:10px 0}
 .loadmore button{font-size:12px;color:var(--sub);background:rgba(255,255,255,.7);padding:5px 14px;border-radius:12px}
 .daysep{text-align:center;margin:18px 0 10px}
@@ -176,13 +178,13 @@ body.dragging-on,body.dragging-on *{cursor:grabbing!important}
 .selmode .msg.sel .bub{box-shadow:0 0 0 2.5px var(--accent)}
 .selmode .mbtn{display:none}
 
-.composer{flex:none;padding:8px 10px calc(10px + var(--safe-b));background:var(--bg);border-top:1px solid var(--line)}
+.composer{flex:none;padding:8px 10px calc(10px + var(--input-safe-b,var(--safe-b)));background:var(--bg);border-top:1px solid var(--line)}
 .pending{display:flex;gap:6px;padding:2px 4px 8px;overflow-x:auto}
 .pending .th{position:relative;flex:none}
 .pending img{width:58px;height:58px;object-fit:cover;border-radius:12px;display:block}
 .pending button{position:absolute;top:-5px;right:-5px;width:20px;height:20px;border-radius:10px;background:var(--ink);color:#fff;font-size:12px;line-height:20px}
 .crow{display:flex;align-items:flex-end;gap:6px}
-.crow textarea{flex:1;resize:none;border:0;outline:none;background:#F1ECE6;border-radius:20px;padding:9px 15px;max-height:160px;min-height:40px;line-height:1.5}
+.crow textarea{flex:1;resize:none;border:0;outline:none;background:#F1ECE6;border-radius:20px;padding:9px 15px;max-height:160px;min-height:40px;line-height:1.5;font-size:16px}
 .send{width:40px;height:40px;border-radius:14px;background:var(--accent);display:grid;place-items:center;flex:none;transition:opacity .15s}
 .send:disabled{opacity:.35}
 .send svg{width:19px;height:19px;stroke:#fff;stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
@@ -1394,6 +1396,34 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js', {scope: '/'}).catch(err => console.warn('NSNS PWA:', err));
   });
 }
+</script>
+<script>
+/* Keep the app inside iOS's visible viewport when the software keyboard opens. */
+(function(){
+  const root=document.documentElement;
+  const vv=window.visualViewport;
+  const apply=()=>{
+    if(!vv)return;
+    const height=Math.round(vv.height);
+    const top=Math.round(vv.offsetTop);
+    root.style.setProperty('--vv-height',height+'px');
+    root.style.setProperty('--vv-top',top+'px');
+    const keyboardOpen=window.innerHeight-height-top>120;
+    root.style.setProperty('--input-safe-b',keyboardOpen?'0px':'env(safe-area-inset-bottom, 0px)');
+    if(keyboardOpen && document.activeElement?.id==='ta'){
+      const chat=document.getElementById('chat');
+      if(chat)chat.scrollTop=chat.scrollHeight;
+    }
+  };
+  if(vv){vv.addEventListener('resize',apply);vv.addEventListener('scroll',apply)}
+  window.addEventListener('resize',apply);
+  window.addEventListener('orientationchange',apply);
+  document.addEventListener('focusin',e=>{if(e.target.matches('input,textarea'))setTimeout(apply,80)});
+  document.addEventListener('focusout',e=>{if(e.target.matches('input,textarea'))setTimeout(apply,100)});
+  document.addEventListener('gesturestart',e=>e.preventDefault(),{passive:false});
+  document.addEventListener('gesturechange',e=>e.preventDefault(),{passive:false});
+  apply();
+})();
 </script>
 </body>
 </html>
