@@ -1835,13 +1835,14 @@ function planBrainstorm(j){
   const title=String(f.title||'ブレスト').trim().slice(0,40);
   const pid=S.cwd&&S.nodes.has(S.cwd)?S.cwd:null;const where=pid?S.nodes.get(pid).name:'ホーム';
   return {count:rooms.length,
-    html:`「${esc(where)}」にフォルダ「<b>${esc(title)}</b>」を作り、トーク <b>${rooms.length}</b>個と問い <b>${qn}</b>件を入れます。<br>${rooms.map(r=>'・'+esc(String(r.title||r.name).slice(0,40))).join('<br>')}`,
+    html:`「${esc(where)}」にフォルダ「<b>${esc(title)}</b>」を作り、一番上の「📝自由メモ」と、トーク <b>${rooms.length}</b>個を入れます。問い <b>${qn}</b>件は、トークを開くと1つずつ出ます（「次」で進む）。<br>${rooms.map(r=>'・'+esc(String(r.title||r.name).slice(0,40))+`（${qs(r).length}）`).join('<br>')}`,
     apply:async iid=>{const t=now();
       const fo={id:uid(),type:'folder',parentId:pid,name:title,emoji:'🧠',color:PALETTE[3],tags:[],order:nextTopOrder(pid),createdAt:t,importId:iid};
-      const ns=[fo],ms=[];let k=0;
-      rooms.forEach((r,i)=>{const ro={id:uid(),type:'room',parentId:fo.id,name:String(r.title||r.name).trim().slice(0,60),emoji:'',color:PALETTE[i%7],tags:[],badge:true,order:i,createdAt:t,lastAt:t,importId:iid};ns.push(ro);
-        qs(r).forEach(q=>{ms.push({id:uid(),roomId:ro.id,text:q,images:[],createdAt:t+(++k),exportedAt:null,exportId:null,by:'ai',importId:iid});ro.lastAt=t+k})});
-      await saveNodes(ns);await saveMsgs(ms);return {nodes:ns.map(n=>n.id),roots:[fo.id],msgs:ms.map(m=>m.id),open:fo.id}}};
+      const free={id:uid(),type:'room',parentId:fo.id,name:'自由メモ',emoji:'📝',color:PALETTE[6],tags:[],badge:true,order:0,createdAt:t,lastAt:t,importId:iid};
+      const ns=[fo,free];
+      rooms.forEach((r,i)=>{const q=qs(r);const ro={id:uid(),type:'room',parentId:fo.id,name:String(r.title||r.name).trim().slice(0,60),emoji:'',color:PALETTE[i%7],tags:[],badge:true,order:i+1,createdAt:t,lastAt:t,importId:iid,qroom:true};
+        if(q.length)ro.mrun={mid:'AI',pos:0,steps:q};ns.push(ro)});
+      await saveNodes(ns);return {nodes:ns.map(n=>n.id),roots:[fo.id],msgs:[],open:fo.id}}};
 }
 function planQuestions(j){
   const ok=[];let miss=0;
@@ -1850,10 +1851,13 @@ function planQuestions(j){
     if(!n||n.type!=='room'){miss++;continue}if(qs.length)ok.push({n,qs})}
   const qn=ok.reduce((a,x)=>a+x.qs.length,0);if(!qn)throw new Error(miss?`トークが見つかりません（${miss}件）`:'新しい問いがありません');
   return {count:qn,
-    html:`トーク <b>${ok.length}</b>個に、次の問い <b>${qn}</b>件を追加します。${miss?`<br>見つからないトーク：${miss}件（スキップ）`:''}<br>${ok.map(x=>`・${esc(x.n.name)}（${x.qs.length}）`).join('<br>')}`,
-    apply:async iid=>{const t=now();let k=0;const ms=[];
-      for(const x of ok){x.qs.forEach(q=>ms.push({id:uid(),roomId:x.n.id,text:q,images:[],createdAt:t+(++k),exportedAt:null,exportId:null,by:'ai',importId:iid}));x.n.lastAt=t+k}
-      await saveMsgs(ms);await saveNodes(ok.map(x=>x.n));return {msgs:ms.map(m=>m.id),open:ok.length===1?ok[0].n.id:null}}};
+    html:`トーク <b>${ok.length}</b>個に、次の問い <b>${qn}</b>件を追加します。トークを開くと1つずつ出ます（「次」で進む）。${miss?`<br>見つからないトーク：${miss}件（スキップ）`:''}<br>${ok.map(x=>`・${esc(x.n.name)}（${x.qs.length}）`).join('<br>')}`,
+    apply:async iid=>{const prevRun={};
+      for(const x of ok){const n=x.n;prevRun[n.id]=n.mrun?JSON.parse(JSON.stringify(n.mrun)):null;
+        let rest=[];if(n.mrun){const c=MCB.get(n.mrun.mid);const st=n.mrun.steps||(c?mSteps(c).steps:[]);rest=st.slice(n.mrun.pos||0)}
+        n.mrun={mid:'AI',pos:0,steps:[...rest,...x.qs]};n.qroom=true;S.qa.delete(n.id)}
+      await saveNodes(ok.map(x=>x.n));if(S.roomId&&ok.some(x=>x.n.id===S.roomId))renderRoom(true);
+      return {prevRun,open:ok.length===1?ok[0].n.id:null}}};
 }
 function planDigest(j){
   const text=String(j.text||'').trim();if(!text)throw new Error('まとめの本文（text）がありません');
@@ -1889,6 +1893,7 @@ async function undoImport(id){
   const a=importsLog();const r=a.find(x=>x.id===id);if(!r||r.undone)return;const u=r.undo||{};
   if(u.prev){const ch=[];for(const [mid,[k,st,tags,kb]] of Object.entries(u.prev)){const m=S.msgs.get(mid);if(!m||m.importId!==r.id)continue;m.kind=k;m.st=st;m.tags=tags;m.kindBy=kb;delete m.importId;ch.push(m)}if(ch.length)await saveMsgs(ch)}
   if(u.moved&&u.moved.length){const ns=[];for(const x of u.moved){const n=S.nodes.get(x.id);if(n){n.parentId=x.parentId;n.order=x.order;ns.push(n)}}if(ns.length)await saveNodes(ns)}
+  if(u.prevRun){const ns=[];for(const [id,v] of Object.entries(u.prevRun)){const n=S.nodes.get(id);if(n){if(v)n.mrun=v;else delete n.mrun;S.qa.delete(id);ns.push(n)}}if(ns.length)await saveNodes(ns);if(S.roomId)renderRoom(true)}
   if(u.prevRec){const ns=[];for(const [id,v] of Object.entries(u.prevRec)){const n=S.nodes.get(id);if(n){if(v)n.rec=v;else delete n.rec;ns.push(n)}}if(ns.length)await saveNodes(ns)}
   if(u.archived&&u.archived.length){const ns=u.archived.map(x=>S.nodes.get(x)).filter(Boolean);ns.forEach(n=>n.archived=false);if(ns.length)await saveNodes(ns)}
   const all=new Map();(u.nodes||[]).forEach(x=>{const n=S.nodes.get(x);if(n){all.set(x,n);if(n.type==='folder')descendants(x).forEach(d=>all.set(d.id,d))}});
