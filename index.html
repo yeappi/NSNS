@@ -402,6 +402,32 @@ details.adv .in{padding:0 14px 14px}
 .qsubs{margin-top:12px}
 .qsl{font-size:12px;color:var(--sub);margin:0 2px 6px}
 .qsc{display:flex;flex-wrap:wrap;gap:6px}
+
+/* 思考法・アナウンス・メモのスワイプ */
+#annwrap{flex:none}
+.annc{display:flex;align-items:center;gap:8px;margin:6px 10px 0;padding:7px 12px;border-radius:12px;background:#fff;box-shadow:0 1px 2px rgba(60,40,20,.06);font-size:12.5px;cursor:pointer}
+.annc .at{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.annc .an{font-size:11px;color:var(--sub);flex:none}
+.annc.rec{background:#F3EEFB;color:#5B4A85}
+.msg.mq .bub.ai::before{content:"🧭 "}
+.bub.ai.m::before{content:"🧭 "}
+.mlist{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.mrow{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:9px 12px;border-radius:12px;background:#fff;box-shadow:0 1px 2px rgba(60,40,20,.06);text-align:left;width:100%}
+.mrow:hover{background:#F8F4FE}
+.mrow .ms{font-size:13.5px;font-weight:700}
+.mrow .mn{font-size:11.5px;color:var(--sub)}
+.mrow .mn i{font-style:normal;margin-left:4px;padding:0 5px;border-radius:6px;background:#EFE9E2}
+.mrow .mw{font-size:11.5px;color:#5B4A85}
+.mfrow{display:flex;align-items:center;gap:6px}
+.mfav{font-size:20px;color:#D9A441;padding:4px 6px;cursor:pointer}
+.mfold{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:13px}
+.mfold small{color:var(--sub);font-size:11px}
+.msg{position:relative}
+.msg .line{transition:transform .18s}
+.swact{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:none;gap:4px;z-index:1}
+.msg.sw .swact{display:flex}
+.swact button{display:flex;flex-direction:column;align-items:center;justify-content:center;width:54px;padding:6px 2px;border-radius:12px;background:#fff;box-shadow:0 1px 3px rgba(60,40,20,.12);font-size:10px;color:#5F5850}
+.swact button span{font-size:17px;line-height:1.2}
 </style>
 </head>
 <body>
@@ -735,7 +761,7 @@ function itemHTML(n,o={}){
 function renderRoom(keepScroll){
   const P=$('#roomPane');const r=S.roomId&&S.nodes.get(S.roomId);
   if(!r){S.roomId=null;S.sel=null;document.body.classList.remove('in-room');P.innerHTML=`<div class="roomempty"><div><div class="logo">NSNS</div><div>トークを選ぶと、ここに開きます</div></div></div>`;return}
-  const st=keepScroll?$('#chat')?.scrollTop:null;
+  const st=keepScroll?$('#chat')?.scrollTop:null;mRestore(r);
   const path=ancestors(r.id).map(a=>a.name).join(' › ');
   let head,bottom;
   if(S.sel){
@@ -767,7 +793,7 @@ function renderRoom(keepScroll){
         <button class="send" id="sendBtn" data-act="send" disabled title="送信">${ICONS.send}</button>
       </div></div>`;
   }
-  P.innerHTML=head+(S.sel?'':`<div id="qwrap">${qBandHTML()}</div>`)+`<div class="chat${S.sel?' selmode':''}" id="chat"></div>`+bottom;
+  P.innerHTML=head+(S.sel?'':`<div id="annwrap">${annHTML(r)}</div><div id="qwrap">${qBandHTML()}</div>`)+`<div class="chat${S.sel?' selmode':''}" id="chat"></div>`+bottom;
   renderChat(!keepScroll);if(keepScroll&&st!=null)$('#chat').scrollTop=st;
   if(!S.sel){
     renderPending();
@@ -784,7 +810,7 @@ function updSend(){const b=$('#sendBtn');if(b)b.disabled=!($('#ta').value.trim()
 function allSelected(){const ms=roomMsgs(S.roomId);return ms.length&&ms.every(m=>S.sel.has(m.id))}
 
 function msgChips(m){
-  const p=[];if(m.pinned)p.push('<span>📌</span>');if(m.aiMade)p.push('<span title="AIがまとめた資料">🤖</span>');
+  const p=[];if(m.pinned)p.push('<span>📢</span>');if(m.aiMade)p.push('<span title="AIがまとめた資料">🤖</span>');
   if(m.kind&&KIND[m.kind])p.push(`<span class="kc">${kindText(m.kind)}</span>`);
   if(m.st&&STL[m.st])p.push(`<span class="sc ${m.st}">${STL[m.st]}</span>`);
   if((m.tags||[]).length)p.push(`<span class="at">${m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`);
@@ -804,7 +830,7 @@ function renderChat(toBottom){
     const nx=ms[i+1];
     if(m.by==='ai'){
       html+=`<div class="msg ai${S.sel&&S.sel.has(m.id)?' sel':''}" data-act="tapMsg" data-id="${m.id}" data-lpm="${m.id}">
-        <div class="line"><div class="bub ai${m.qid?' q':''}">${linkify(m.text||'')}</div><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button></div></div>`;
+        <div class="line"><div class="bub ai${m.qid?' q':m.mid?' m':''}">${linkify(m.text||'')}</div><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button></div></div>`;
       return;
     }
     const chips=msgChips(m);
@@ -812,6 +838,7 @@ function renderChat(toBottom){
     const n=m.images?.length||0;
     const imgs=n?`<div class="imgs ${n===1?'n1':n===2?'n2':n===3?'n3':n===4?'n4':'nmany'}">${m.images.map(b=>`<img data-blob="${b}" data-act="viewImg" alt="">`).join('')}</div>`:'';
     html+=`<div class="msg${S.sel&&S.sel.has(m.id)?' sel':''}" data-act="tapMsg" data-id="${m.id}" data-lpm="${m.id}">
+      <div class="swact"><button data-act="msgAnn" data-id="${m.id}"><span>📢</span>${m.pinned?'外す':'アナウンス'}</button><button data-act="msgRoom" data-id="${m.id}"><span>💬</span>トークにする</button></div>
       <div class="line"><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button><div class="bub${m.exportedAt?' done':''}${n&&!m.text?' onlyimg':''}">${imgs}${m.text?linkify(m.text):''}</div></div>
       ${showMeta?`<div class="meta">${chips}${m.exportedAt?'<span class="done">✓ 書き出し済</span>':''}<span>${hm(m.createdAt)}</span></div>`:''}</div>`;
     if(m.aizuchi)html+=`<div class="reply"><div class="rbub">${esc(m.aizuchi)}</div></div>`;
@@ -1031,7 +1058,8 @@ function msgMenu(id){
   menuSheet('',[
     {icon:'☑',label:'選択する',sub:'複数選んで書き出し・移動',fn:()=>selStart(id)},
     m.by==='ai'?null:{icon:'🏷',label:'分類（種類・状態）',sub:m.kind||m.st?[kindText(m.kind),STL[m.st]].filter(Boolean).join('・'):'未分類',fn:()=>classifySheet([m])},
-    m.by==='ai'?null:{icon:'📌',label:m.pinned?'ピンを外す':'ピン留め',fn:async()=>{m.pinned=!m.pinned;await saveMsg(m);renderChat()}},
+    m.by==='ai'?null:{icon:'📢',label:m.pinned?'アナウンスを外す':'アナウンスにする',sub:'トークの上に表示します',fn:()=>togglePin(m)},
+    m.by==='ai'?null:{icon:'💬',label:'トークにする',sub:'このメモを新しいトークに移します',fn:()=>msgToRoom(m)},
     {icon:'⧉',label:'コピー',fn:()=>copyText(m.text||'')},
     {icon:'✎',label:'編集',sub:'本文の一部だけ選んでコピーしたいときもここから',fn:()=>editMsg(m)},
     {icon:'⇢',label:'別のトークへ移動',fn:()=>moveMsgsSheet([m])},
@@ -1094,7 +1122,7 @@ function parseExpr(src){
     if(t.k==='sp'){
       const kw=kindWord(v);if(kw!==undefined)return m=>(m.kind||null)===kw;
       const sw={'未確定':'draft','draft':'draft','確定':'fixed','fixed':'fixed','完了':'done'}[v];if(sw)return m=>m.st===sw;
-      if(['ピン','pin','📌'].includes(v))return m=>!!m.pinned;
+      if(['ピン','pin','📌','アナウンス','📢'].includes(v))return m=>!!m.pinned;
       if(v==='ai')return m=>m.by==='ai';
       if(['画像','img','image','写真'].includes(v))return m=>(m.images||[]).length>0;
       if(['済','書き出し済','exported','done'].includes(v))return m=>!!m.exportedAt;
@@ -1417,7 +1445,7 @@ function classifySheet(list,onDone){
   const draw=()=>{
     q('#cK').innerHTML=[{id:null,ic:'',label:'未分類'},...KINDS].map(k=>`<span class="chip ${kind===k.id?'in':''}" data-k="${k.id??''}">${k.ic}${k.label}</span>`).join('');
     q('#cS').innerHTML=[{id:null,label:'なし'},...STS].map(x=>`<span class="chip ${st===x.id?'in':''}" data-s="${x.id??''}">${x.label}</span>`).join('');
-    q('#cP').innerHTML=`<span class="chip ${pin===true?'in':''}" data-p="1">📌 ピン留め</span><span class="chip ${pin===false?'in':''}" data-p="0">なし</span>`;
+    q('#cP').innerHTML=`<span class="chip ${pin===true?'in':''}" data-p="1">📢 アナウンス</span><span class="chip ${pin===false?'in':''}" data-p="0">なし</span>`;
     sh.querySelectorAll('[data-k]').forEach(c=>c.onclick=()=>{kind=c.dataset.k||null;touched.kind=1;draw()});
     sh.querySelectorAll('[data-s]').forEach(c=>c.onclick=()=>{st=c.dataset.s||null;touched.st=1;draw()});
     sh.querySelectorAll('[data-p]').forEach(c=>c.onclick=()=>{pin=c.dataset.p==='1';touched.pin=1;draw()});
@@ -1623,6 +1651,77 @@ function copyPrompt(type,o){
   const n=o.msgs?`メモ${o.msgs.length}件`:`トーク${o.rooms.length}個`;
   copyText(PROMPTS[type](o),true).then(ok=>{if(ok)toast(`${AI_LABEL[type]}のプロンプトをコピーしました（${n}）。AIに貼って、確定したJSONを取り込んでください`,'取り込む',()=>importSheet())});
 }
+/* ---------- AI思考法（レベル1〜5） ---------- */
+const THINK_LV=[
+ [1,'全体でおすすめの思考法を1つ'],
+ [2,'全体でおすすめの思考法をTOP3'],
+ [3,'優先度が特に高いトークだけ、AI専用の問い＋TOP3'],
+ [4,'優先度が低くないトークに、AI専用の問い＋TOP3'],
+ [5,'すべてのトークに、AI専用の問い＋TOP3']];
+const mCatalogForAI=()=>MC.map(c=>`${c.id} ${c.n}｜向く場面：${c.sc}｜型：${c.ty==='rep'?'繰り返し':'順番'}｜部屋：${{one:'1部屋',frames:'枠ごと',targets:'対象ごと'}[c.rm]}`).join('\n');
+PROMPTS.think=({rooms,level})=>{
+  const per=level>=3;const tgt={3:'優先度が「高」',4:'優先度が「高」または「中」',5:'すべて'}[level];
+  return `あなたは考えを深める手伝いをするアシスタントです。下の【トーク】を読んで、【思考法カタログ】から合う思考法を選んでください。${per?`さらに、${tgt}のトークには、そのテーマ専用の問いを作ってください。`:''}
+
+${P_FLOW}
+（一覧は、${per?'トークごとに優先度・おすすめ・作る問い':'おすすめの思考法と理由'}を）
+
+# ルール（レベル${level}）
+- ${level===1?'全体に対して、いちばん合う思考法を1つだけ overall に入れる。':'全体に対して、合う思考法をTOP3まで overall に入れる。'}
+- 思考法は【思考法カタログ】のIDだけを使う。カタログにないものは使わない。理由（why）は20字以内で一言。
+${per?`- トークごとに priority（高／中／低）と、その理由を一言付ける。
+- トークごとに、合う思考法をTOP3まで recommend に入れる。
+- ${tgt}のトークには custom を作る。custom は「部屋」の配列で、各部屋に name（15字以内）と questions（問いの配列）を入れる。
+- 問いが前の答えを受けて進むなら1部屋にまとめる。問い同士が独立していて、それぞれに答えが溜まるなら、枠ごとに部屋を分ける。
+- 問いは短く具体的に。はい／いいえで終わらない形にする。メモにない事実を決めつけない。
+- それ以外のトークは custom を空にする。`:'- rooms は空でよい。'}
+- 省略せず、全部出力してください。「以下同様」などで省かない。
+
+# 出力形式
+{"nsns":1,"type":"think","level":${level},"overall":[{"method":"M3","why":"…"}],"rooms":[${per?'{"id":"トークのid","priority":"高","why":"…","recommend":[{"method":"M1","why":"…"}],"custom":[{"name":"…","questions":["…","…"]}]}':''}]}
+- id は各トークの見出しの「id:」の後ろをそのまま使う。
+
+# 思考法カタログ
+${mCatalogForAI()}
+
+# トーク（${rooms.length}個）
+${rooms.map(roomForAI).join('\n\n')}
+`};
+AI_LABEL.think='AI思考法';
+function thinkSheet(rooms){
+  const cur=LS.get('thinkLv',2);
+  menuSheet('🧭 AI思考法のレベル',THINK_LV.map(([lv,d])=>({icon:lv===cur?'●':'○',label:`レベル${lv}`,sub:d,fn:()=>{LS.set('thinkLv',lv);
+    const rs=rooms.filter(r=>r&&!r.docs);LS.set('thinkLast',{ids:rs.map(r=>r.id),level:lv});copyPrompt('think',{rooms:rs,level:lv})}})));
+}
+function planThink(j){
+  const ov=(Array.isArray(j.overall)?j.overall:[]).map(x=>({m:String(x?.method||x?.m||'').trim(),why:String(x?.why||'').slice(0,40)})).filter(x=>MCB.has(x.m)).slice(0,3);
+  const last=LS.get('thinkLast',{ids:[]});const sent=new Set(last.ids||[]);
+  const rows=[];let miss=0,bad=0;
+  for(const r of (Array.isArray(j.rooms)?j.rooms:[])){const n=S.nodes.get(String(r?.id??''));if(!n||n.type!=='room'){miss++;continue}
+    const rec=(Array.isArray(r.recommend)?r.recommend:[]).map(x=>({m:String(x?.method||x?.m||'').trim(),why:String(x?.why||'').slice(0,40)}));
+    bad+=rec.filter(x=>!MCB.has(x.m)).length;
+    const custom=(Array.isArray(r.custom)?r.custom:[]).map(c=>({name:String(c?.name||'AIの問い').trim().slice(0,30),qs:(Array.isArray(c?.questions)?c.questions:[]).map(x=>String(x).trim()).filter(Boolean)})).filter(c=>c.qs.length);
+    rows.push({n,pr:String(r.priority||'').trim(),why:String(r.why||'').slice(0,40),rec:rec.filter(x=>MCB.has(x.m)).slice(0,3),custom})}
+  // レベル1〜2：全体のおすすめを、渡したトークに付ける
+  const targets=rows.length?rows:[...sent].map(id=>S.nodes.get(id)).filter(Boolean).map(n=>({n,pr:'',why:'',rec:ov,custom:[]}));
+  if(!rows.length&&!ov.length)throw new Error('おすすめも問いもありません');
+  const got=new Set(rows.map(x=>x.n.id));const lack=rows.length?[...sent].filter(id=>!got.has(id)&&S.nodes.has(id)).length:0;
+  const nRooms=targets.reduce((a,x)=>a+x.custom.length,0),nQ=targets.reduce((a,x)=>a+x.custom.reduce((b,c)=>b+c.qs.length,0),0);
+  const prc={'高':'#C9583F','中':'#B98A2E','低':'#8A847C'};
+  return {count:Math.max(1,targets.length),
+    html:`${ov.length?`全体のおすすめ：<b>${ov.map(x=>esc(MCB.get(x.m).n)).join('・')}</b><br>`:''}${rows.length?rows.map(x=>`・${x.pr?`<b style="color:${prc[x.pr]||'inherit'}">${esc(x.pr)}</b> `:''}${esc(x.n.name)}${x.why?`（${esc(x.why)}）`:''}${x.custom.length?` → 問いの部屋 ${x.custom.length}`:''}`).join('<br>'):`トーク ${targets.length}個に、おすすめを付けます。`}
+      ${nRooms?`<br>新しく作る部屋 <b>${nRooms}</b>個・問い <b>${nQ}</b>件`:''}
+      ${lack?`<br><span style="color:#C9583F">渡したトークのうち ${lack}個ぶんが返ってきていません。続きを出してもらうか、このまま取り込めます。</span>`:''}
+      ${miss?`<br>見つからないトーク：${miss}件（スキップ）`:''}${bad?`<br>カタログにない思考法：${bad}件（無視します）`:''}`,
+    apply:async iid=>{const nodes=[],moved=[],prevRec={};let open=null;
+      for(const x of targets){const n=x.n;prevRec[n.id]=n.rec||null;n.rec=x.rec.length?x.rec:ov;n.recAt=now();await saveNode(n);
+        if(!x.custom.length)continue;
+        let pid=n.parentId||null;const fold=x.custom.length>1;
+        if(fold){const p=n.parentId&&S.nodes.get(n.parentId);const had=p&&p.type==='folder'&&p.name===n.name;const f=await ensureFolder(n,iid,moved);pid=f.id;if(!had)nodes.push(f.id)}
+        const rs=x.custom.map(c=>mkRoom(pid,uniqName(fold?c.name:`${n.name}｜${c.name}`,pid),n.color,{mrun:{mid:'AI',pos:0,steps:c.qs},importId:iid}));
+        await insertAfter(n,rs,pid);rs.forEach(r=>nodes.push(r.id));open=open||rs[0].id}
+      return {nodes,roots:nodes,moved,prevRec,open:targets.length===1?(open||targets[0].n.id):null}}};
+}
 function aiNodeMenu(n){
   const rooms=n.type==='room'?[n]:descendants(n.id).filter(d=>d.type==='room'&&!d.docs&&!d.archived);
   const msgs=rooms.flatMap(r=>roomMsgs(r.id)).filter(m=>m.by!=='ai');
@@ -1632,6 +1731,7 @@ function aiNodeMenu(n){
     {icon:'🏷',label:'未分類のメモをAIで分類',sub:`${un.length}件`,fn:()=>copyPrompt('classify',{msgs:un})},
     {icon:'🏷',label:'すべてのメモをAIで分類し直す',sub:`${msgs.length}件（自分で付けた種類・状態は変わりません）`,fn:()=>copyPrompt('classify',{msgs})},
     {icon:'🧠',label:'ここからブレストする',sub:'論点ごとにトークを作り、問いを立ててもらう',fn:()=>copyPrompt('brainstorm',{msgs})},
+    {icon:'🧭',label:'AI思考法で問いを作る',sub:'レベル1〜5を選んでプロンプトをコピー',fn:()=>thinkSheet(rooms)},
     {icon:'❓',label:'AIに次の問いを考えてもらう',sub:'書いた答えを踏まえて深掘り',fn:()=>copyPrompt('next',{rooms})},
     {icon:'📎',label:'AIで資料化する',sub:'まとめを「資料」トークに入れ、終わったトークをアーカイブ',fn:()=>copyPrompt('digest',{rooms,folderId:fid})},
     {icon:'📥',label:'AIの結果を取り込む',fn:()=>importSheet()},
@@ -1739,6 +1839,7 @@ function makePlan(j){
     case 'brainstorm':return planBrainstorm(j);
     case 'questions':return planQuestions(j);
     case 'digest':return planDigest(j);
+    case 'think':return planThink(j);
   }
   throw new Error(`知らない種類のJSONです（type: ${j.type}）`);
 }
@@ -1747,6 +1848,8 @@ const saveImports=a=>LS.set('imports',a.slice(0,15));
 async function undoImport(id){
   const a=importsLog();const r=a.find(x=>x.id===id);if(!r||r.undone)return;const u=r.undo||{};
   if(u.prev){const ch=[];for(const [mid,[k,st,tags,kb]] of Object.entries(u.prev)){const m=S.msgs.get(mid);if(!m||m.importId!==r.id)continue;m.kind=k;m.st=st;m.tags=tags;m.kindBy=kb;delete m.importId;ch.push(m)}if(ch.length)await saveMsgs(ch)}
+  if(u.moved&&u.moved.length){const ns=[];for(const x of u.moved){const n=S.nodes.get(x.id);if(n){n.parentId=x.parentId;n.order=x.order;ns.push(n)}}if(ns.length)await saveNodes(ns)}
+  if(u.prevRec){const ns=[];for(const [id,v] of Object.entries(u.prevRec)){const n=S.nodes.get(id);if(n){if(v)n.rec=v;else delete n.rec;ns.push(n)}}if(ns.length)await saveNodes(ns)}
   if(u.archived&&u.archived.length){const ns=u.archived.map(x=>S.nodes.get(x)).filter(Boolean);ns.forEach(n=>n.archived=false);if(ns.length)await saveNodes(ns)}
   const all=new Map();(u.nodes||[]).forEach(x=>{const n=S.nodes.get(x);if(n){all.set(x,n);if(n.type==='folder')descendants(x).forEach(d=>all.set(d.id,d))}});
   const rooms=new Set([...all.values()].filter(n=>n.type==='room').map(n=>n.id));
@@ -1828,7 +1931,7 @@ const QSRC=[
  ['reflect','',181,['ここまでで、一番大事だったのは？','書き始めた頃と、今で変わったことは？','意外だったことは？','次に活かすなら、何？','誰かに話すとしたら、どこから話す？','ここまでで、うまくいったことは？','ここまでで、うまくいかなかったことは？','思ったより早く進んだことは？','思ったより時間がかかったことは？','続けたいことは？','やめたいことは？','新しく試したいことは？','ここまでで、わかったことを1つ挙げるなら？','まだ残ってる疑問は？','過去の自分に、一言かけるなら？']]];
 const QS=[];QSRC.forEach(([f,sub,st,arr])=>arr.forEach((t,i)=>QS.push({id:st+i,f,sub,t})));
 const QBY=new Map(QS.map(q=>[q.id,q]));
-S.qa=new Map(); // roomId -> {f,subs,cur,answered}
+S.qa=new Map(); // roomId -> 問いの状態。ランダム：{f,subs,cur,...} / 思考法：{m,steps,pos,lastAt,...}
 const qSubs=()=>{const v=LS.get('qsubs',['gen']);return Array.isArray(v)&&v.length?v:['gen']};
 const qKey=(f,subs)=>f==='dump'?'dump:'+(subs.includes('all')?'all':[...subs].sort().join('+')):f;
 function qPool(f,subs){return QS.filter(q=>q.f===f&&(f!=='dump'||subs.includes('all')||subs.includes(q.sub))).map(q=>q.id)}
@@ -1839,64 +1942,198 @@ function qDraw(f,subs){
   const id=bag.shift();LS.set(key,bag);return id;
 }
 function qStat(id,i){const s=LS.get('qstats',{});const a=s[id]||[0,0,0];a[i]++;s[id]=a;LS.set('qstats',s)}
+const qText=a=>a.m?(a.steps[a.pos]||''):(QBY.get(a.cur)?.t||'');
 function qShow(rid,f,subs){
   const id=qDraw(f,subs);if(id==null){toast('出せる問いがありません');return}
-  const prev=S.qa.get(rid);const trail=prev&&prev.f===f&&prev.trail?prev.trail:[];
+  const prev=S.qa.get(rid);const trail=prev&&!prev.m&&prev.f===f&&prev.trail?prev.trail:[];
   S.qa.set(rid,{f,subs,cur:id,answered:false,trail});qStat(id,0);
   if(S.roomId===rid&&!S.sel)qRefresh();
 }
 function qRefresh(){const w=$('#qwrap');if(w)w.innerHTML=qBandHTML();renderChat(true)}
 function scrollChatEnd(){const c=$('#chat');if(c)c.scrollTop=c.scrollHeight}
 function qNext(){const rid=S.roomId,a=S.qa.get(rid);if(!a)return;
-  if(!a.answered){qStat(a.cur,1);a.trail.push(a.cur);if(a.trail.length>=3)a.trail=[]}else a.trail=[];
+  const skipped=!a.answered;
+  if(skipped){if(!a.m)qStat(a.cur,1);a.trail.push(qText(a));if(a.trail.length>=3)a.trail=[]}else a.trail=[];
+  if(a.m)return mAdvance(rid,a.pos+1);
   qShow(rid,a.f,a.subs)}
-function qEnd(){S.qa.delete(S.roomId);qRefresh()}
+function qEnd(){const rid=S.roomId,a=S.qa.get(rid);S.qa.delete(rid);
+  if(a&&a.m){const r=S.nodes.get(rid);if(r&&r.mrun){delete r.mrun;saveNode(r)}}
+  qRefresh()}
 function qAuto(){LS.set('qauto',!LS.get('qauto',false));qRefresh()}
 function qBandHTML(){
-  const a=S.qa.get(S.roomId);if(!a)return '';const f=QFK[a.f];
-  const sub=a.f==='dump'?(a.subs.includes('all')?'すべて':a.subs.map(s=>QSUBL[s]).join('・')):'';
-  const auto=LS.get('qauto',false);
-  return `<div class="qband"><span class="qb-t">${f.ic} ${f.t}${sub?`<small>${esc(sub)}</small>`:''}</span>
-    <button class="qb-auto${auto?' on':''}" data-act="qAuto" title="1件書いたら次の問いへ">自動で次へ</button>
+  const a=S.qa.get(S.roomId);if(!a)return '';const auto=LS.get('qauto',false);
+  let t,extra='';
+  if(a.m){const c=MCB.get(a.m);const custom=!c;t=`🧭 ${esc(custom?'AIの問い':c.n)}<small>${Math.min(a.pos+1,a.steps.length)}/${a.steps.length}</small>`;
+    if(a.repEnd!=null&&a.pos>=a.repStart&&a.pos<a.repEnd)extra=`<button class="qb-enough" data-act="mEnough">もう十分</button>`}
+  else{const f=QFK[a.f];const sub=a.f==='dump'?(a.subs.includes('all')?'すべて':a.subs.map(s=>QSUBL[s]).join('・')):'';t=`${f.ic} ${f.t}${sub?`<small>${esc(sub)}</small>`:''}`}
+  return `<div class="qband"><span class="qb-t">${t}</span>
+    <button class="qb-auto${auto?' on':''}" data-act="qAuto" title="1件書いたら次の問いへ">自動で次へ</button>${extra}
     <button class="qb-next" data-act="qNext">次</button>
     <button class="qb-x" data-act="qEnd" title="問いをやめる">✕</button></div>`;
 }
 function qBubbleHTML(){
-  const a=S.qa.get(S.roomId);if(!a||a.answered)return '';const q=QBY.get(a.cur);if(!q)return '';
-  const tr=(a.trail||[]).map(id=>`<div class="msg ai qtmp qold"><div class="line"><div class="bub ai">${esc(QBY.get(id)?.t||'')}</div></div></div><div class="msg qskip"><div class="line"><div class="bub">次</div></div></div>`).join('');
-  return tr+`<div class="msg ai qtmp"><div class="line"><div class="bub ai">${esc(q.t)}</div></div></div>`;
+  const a=S.qa.get(S.roomId);if(!a||a.answered)return '';const t=qText(a);if(!t)return '';
+  const tr=(a.trail||[]).map(x=>`<div class="msg ai qtmp qold"><div class="line"><div class="bub ai">${esc(x)}</div></div></div><div class="msg qskip"><div class="line"><div class="bub">次</div></div></div>`).join('');
+  return tr+`<div class="msg ai qtmp${a.m?' mq':''}"><div class="line"><div class="bub ai">${esc(t)}</div></div></div>`;
 }
 /* 送信時に呼ぶ。true を返したらメモとしては保存しない（「次」） */
 async function qOnSend(text){
   const rid=S.roomId,a=S.qa.get(rid);if(!a)return false;
   if(/^\s*(次|つぎ)\s*$/.test(text)&&!S.pending.length){const ta=$('#ta');if(ta){ta.value='';autoGrow(ta);updSend()}LS.set('draft:'+rid,'');qNext();return true}
+  if(/^\s*もう十分\s*$/.test(text)&&a.m&&!S.pending.length){const ta=$('#ta');if(ta){ta.value='';autoGrow(ta);updSend()}LS.set('draft:'+rid,'');mEnough();return true}
   if(!a.answered){
-    const q=QBY.get(a.cur);
-    const qm={id:uid(),roomId:rid,text:q.t,images:[],createdAt:now()-1,exportedAt:null,exportId:null,by:'ai',qid:q.id};
-    await saveMsg(qm);a.answered=true;a.trail=[];qStat(q.id,2);
+    const qm={id:uid(),roomId:rid,text:qText(a),images:[],createdAt:now()-1,exportedAt:null,exportId:null,by:'ai'};
+    if(a.m)qm.mid=a.m;else{qm.qid=a.cur;qStat(a.cur,2)}
+    await saveMsg(qm);a.answered=true;a.trail=[];
   }
   return false;
 }
-function qAfterSend(){const a=S.qa.get(S.roomId);if(a&&a.answered&&LS.get('qauto',false))qShow(S.roomId,a.f,a.subs)}
+function qAfterSend(){const a=S.qa.get(S.roomId);if(!(a&&a.answered&&LS.get('qauto',false)))return;
+  if(a.m)mAdvance(S.roomId,a.pos+1);else qShow(S.roomId,a.f,a.subs)}
+
+/* ---------- 思考法 ---------- */
+/* ty: rep=同じ問いを重ねる / seq=順番。rm: one=1部屋 / frames=枠ごとに部屋 / targets=対象ごとに部屋。★=研究で効果が確かめられた仕組み */
+const MC=[
+ {id:'M1',n:'5Why',sc:'原因を知りたい',ty:'rep',rm:'one',first:['何が起きてる？'],rep:['それはなぜ？'],max:5,last:[]},
+ {id:'M2',n:'友達視点',sc:'悩んで決められない',ty:'seq',rm:'one',star:1,q:['友達が同じことで悩んでたら、何て言う？','それを自分に言うなら？','言われてどう思う？']},
+ {id:'M3',n:'プレモーテム',sc:'これから始める',ty:'seq',rm:'one',star:1,q:['半年後、失敗してた。理由は？','一番ありそうなのは？','今できる対策は？']},
+ {id:'M4',n:'プロコン',sc:'選択肢を比べたい',ty:'seq',rm:'targets',targets:['選択肢A','選択肢B'],q:['良い点は？','悪い点は？'],final:['並べてみて、どっちに傾く？']},
+ {id:'M5',n:'if-then',sc:'決めたのに動けない',ty:'seq',rm:'one',star:1,q:['やると決めたことは？','いつ、どこで？','邪魔が入るとしたら？','「もし〇〇なら△△する」で書くと？']},
+ {id:'M6',n:'抽象と具体の往復',sc:'ぼんやりして言葉にならない',ty:'rep',rm:'one',first:['今思ってることを、そのまま書くと？'],rep:['つまり？','例えば？'],max:6,last:[]},
+ {id:'M7',n:'第一原理',sc:'当たり前を疑いたい',ty:'rep',rm:'one',first:['前提になってることは？'],rep:['それは本当？'],max:5,last:['前提を外したら、何ができる？']},
+ {id:'M8',n:'バックキャスティング',sc:'目標から逆算したい',ty:'rep',rm:'one',first:['ゴールは？'],rep:['その直前は、何ができてる？'],max:5,last:['今日やることは？']},
+ {id:'M9',n:'10-10-10',sc:'感情で決めそう',ty:'seq',rm:'one',q:['10分後、どう思う？','10ヶ月後は？','10年後は？']},
+ {id:'M10',n:'最悪・最良・現実',sc:'不安で動けない',ty:'seq',rm:'one',star:1,q:['最悪は？','最良は？','一番ありそうなのは？','最悪でも、どうする？']},
+ {id:'M11',n:'気持ちの仕分け',sc:'モヤモヤを整理したい',ty:'seq',rm:'one',star:1,q:['何があった？（事実だけ）','そのときの気持ちに名前をつけると？','本当はどうしてほしかった？']},
+ {id:'M12',n:'反対を考える',sc:'自信がある、決めかけてる',ty:'seq',rm:'one',star:1,q:['今の考えは？','反対の立場から言うなら？','それでも今の考えが正しい理由は？']},
+ {id:'M13',n:'説明してみる',sc:'理解したい、学びを固めたい',ty:'seq',rm:'one',star:1,q:['知らない人に説明すると？','詰まったところは？','もっと簡単に言い直すと？']},
+ {id:'M14',n:'イシュー特定',sc:'何から考えればいいかわからない',ty:'seq',rm:'one',q:['本当に答えを出したい問いは？','それが解けたら何が変わる？','今わかってることと、わからないことは？']},
+ {id:'M15',n:'GROW',sc:'目標に向けて整理したい',ty:'seq',rm:'one',q:['ゴールは？','今の状態は？','取れる選択肢は？','何をやる？']},
+ {id:'M16',n:'アイゼンハワー',sc:'やることが多すぎる',ty:'seq',rm:'frames',frames:[['急ぎで大事','急ぎで大事なことは？'],['大事だけど急がない','大事だけど急がないことは？'],['急ぎだけど大事じゃない','急ぎだけど大事じゃないことは？'],['やめていい','やめていいことは？']]},
+ {id:'M17',n:'6つの帽子',sc:'色んな角度から見たい',ty:'seq',rm:'frames',frames:[['事実','事実は？'],['気持ち','気持ちは？'],['リスク','リスクは？'],['良い点','良い点は？'],['アイデア','新しいアイデアは？'],['まとめ','まとめると？']]},
+ {id:'M18',n:'SCAMPER',sc:'今あるものを良くしたい',ty:'seq',rm:'frames',frames:[['置き換え','置き換えるなら？'],['組み合わせ','組み合わせるなら？'],['借りる','他から借りるなら？'],['大小','大きく／小さくするなら？'],['別の使い道','別の使い道は？'],['削る','削るなら？'],['逆','逆にするなら？']]},
+ {id:'M19',n:'アナロジー',sc:'新しい発想がほしい',ty:'seq',rm:'one',q:['これ、何に似てる？','そこではどう解決してる？','こっちに持ち込むなら？']},
+ {id:'M20',n:'SWOT',sc:'自分や計画の今を把握したい',ty:'seq',rm:'frames',frames:[['強み','強みは？'],['弱み','弱みは？'],['追い風','追い風は？'],['向かい風','向かい風は？']]},
+ {id:'M21',n:'仮説思考',sc:'答えを早く出したい',ty:'seq',rm:'one',q:['今の仮の答えは？','そう思う根拠は？','違ったら何でわかる？','どう確かめる？']},
+ {id:'M22',n:'KPT',sc:'やったことを振り返る',ty:'seq',rm:'frames',frames:[['Keep','続けたいことは？'],['Problem','困ったことは？'],['Try','次に試すことは？']]}];
+const MCB=new Map(MC.map(c=>[c.id,c]));
+const M_USUAL=['M1','M2','M3','M4','M5'];
+function mSteps(c){if(c.ty!=='rep')return {steps:[...c.q]};const reps=[];for(let i=0;i<c.max;i++)reps.push(c.rep[i%c.rep.length]);
+  const steps=[...c.first,...reps,...c.last];return {steps,repStart:c.first.length,repEnd:c.first.length+reps.length}}
+/* トークを開いたとき、保存してある進み具合から問いを戻す */
+function mRestore(r){if(!r||!r.mrun||S.qa.has(r.id))return;const run=r.mrun;
+  const c=MCB.get(run.mid);const st=run.steps?{steps:run.steps}:c?mSteps(c):null;if(!st||run.pos>=st.steps.length)return;
+  S.qa.set(r.id,{m:run.mid||'AI',steps:st.steps,repStart:st.repStart,repEnd:st.repEnd,pos:run.pos,answered:false,trail:[]})}
+async function mAdvance(rid,pos){
+  const a=S.qa.get(rid);const r=S.nodes.get(rid);if(!a||!r)return;
+  if(pos>=a.steps.length){S.qa.delete(rid);if(r.mrun){delete r.mrun;await saveNode(r)}toast('問いはここまでです');if(S.roomId===rid)qRefresh();return}
+  a.pos=pos;a.answered=false;if(r.mrun){r.mrun.pos=pos;await saveNode(r)}
+  if(S.roomId===rid&&!S.sel)qRefresh();
+}
+function mEnough(){const rid=S.roomId,a=S.qa.get(rid);if(!a||!a.m)return;a.trail=[];mAdvance(rid,a.repEnd!=null&&a.pos<a.repEnd?a.repEnd:a.steps.length)}
+/* 並び：src の直後に list を差し込む */
+async function insertAfter(src,list,pid){const sibs=sortNodes(kids(pid)).filter(x=>!list.includes(x));const i=sibs.indexOf(src);
+  const all=i<0?[...list,...sibs]:[...sibs.slice(0,i+1),...list,...sibs.slice(i+1)];all.forEach((x,k)=>{x.parentId=pid;x.order=k});await saveNodes(all)}
+/* 「元の部屋名」フォルダを用意（同じ名前のフォルダの中にいれば、それを使う）。src はフォルダへ移す */
+async function ensureFolder(src,iid,moved){
+  const p=src.parentId&&S.nodes.get(src.parentId);if(p&&p.type==='folder'&&p.name===src.name)return p;
+  const pid=src.parentId||null;
+  const f={id:uid(),type:'folder',parentId:pid,name:src.name,emoji:'',color:src.color||PALETTE[2],tags:[],order:src.order??0,createdAt:now()};if(iid)f.importId=iid;
+  moved&&moved.push({id:src.id,parentId:src.parentId||null,order:src.order??0});
+  const sibs=sortNodes(kids(pid)).map(x=>x===src?f:x);sibs.forEach((x,k)=>x.order=k);
+  src.parentId=f.id;src.order=0;await saveNodes([f,...sibs.filter(x=>x!==f),src]);return f;
+}
+const uniqName=(base,pid)=>{const names=new Set(kids(pid).map(k=>k.name));if(!names.has(base))return base;let i=2;while(names.has(`${base} ${i}`))i++;return `${base} ${i}`};
+function mkRoom(pid,name,color,extra){return Object.assign({id:uid(),type:'room',parentId:pid,name:name.slice(0,60),emoji:'',color:color||PALETTE[Math.floor(Math.random()*7)],tags:[],badge:true,order:0,createdAt:now(),lastAt:now()},extra||{})}
+async function mStart(mid,rid,fold){
+  const c=MCB.get(mid),src=S.nodes.get(rid);if(!c||!src)return;
+  const needF=c.rm!=='one'||fold;let pid=src.parentId||null,base=src.name;
+  if(needF){const f=await ensureFolder(src,null,null);pid=f.id}
+  const rooms=[];
+  if(c.rm==='one'){const st=mSteps(c);rooms.push(mkRoom(pid,uniqName(needF?c.n:`${base}｜${c.n}`,pid),src.color,{mrun:{mid,pos:0}}))}
+  else if(c.rm==='frames')c.frames.forEach(([lb,q])=>rooms.push(mkRoom(pid,uniqName(`${c.n}｜${lb}`,pid),null,{mrun:{mid,pos:0,steps:[q]}})));
+  else{c.targets.forEach(lb=>rooms.push(mkRoom(pid,uniqName(`${c.n}｜${lb}`,pid),null,{mrun:{mid,pos:0,steps:[...c.q]}})));
+    if(c.final)rooms.push(mkRoom(pid,uniqName(`${c.n}｜比べる`,pid),null,{mrun:{mid,pos:0,steps:[...c.final]}}))}
+  await insertAfter(src,rooms,pid);
+  const mu=LS.get('mstats',{});mu[mid]=(mu[mid]||0)+1;LS.set('mstats',mu);
+  if(needF&&c.rm!=='one'){S.cwd=pid}
+  openRoom(rooms[0].id);renderList();
+  if(c.rm!=='one')toast(`「${src.name}」フォルダに${rooms.length}個のトークを作りました`);
+}
+const mFav=()=>LS.get('mfav',[]);
+function mRow(c,why){return `<button class="mrow" data-m="${c.id}"><span class="ms">${esc(c.sc)}</span><span class="mn">${esc(c.n)}${c.star?' ★':''}${c.rm!=='one'?' <i>フォルダ</i>':''}</span>${why?`<small class="mw">${esc(why)}</small>`:''}</button>`}
 function qSheet(){
-  const rid=S.roomId;if(!rid)return;let subs=qSubs();
+  const rid=S.roomId;if(!rid)return;let subs=qSubs();const r=S.nodes.get(rid);
+  const rec=(r.rec||[]).filter(x=>MCB.has(x.m));
+  const usual=[...new Set([...M_USUAL,...mFav()])].filter(id=>MCB.has(id));
   const sh=openSheet(`<h3>💡 問いかけ</h3>
     <div class="qgrid">${QF.map(f=>`<button data-f="${f.k}"><span class="qi">${f.ic}</span><b>${f.t}</b><small>${f.d}</small></button>`).join('')}</div>
     <div class="qsubs"><div class="qsl">吐き出すで出す分野</div><div class="qsc"></div></div>
+    <div class="flabel" style="margin-top:18px">🧭 思考法（新しいトークを作って、順番に問いを出します）</div>
+    ${rec.length?`<div class="qsl" style="margin-top:6px">AIのおすすめ</div><div class="mlist">${rec.map(x=>mRow(MCB.get(x.m),x.why)).join('')}</div>`:''}
+    <div class="mlist">${usual.map(id=>mRow(MCB.get(id))).join('')}</div>
+    <button class="chip" data-x="more" style="margin-top:8px">もっと見る（${MC.length}）</button>
+    <div class="mall hidden"></div>
+    <label class="mfold"><input type="checkbox" id="mFold"${LS.get('mfold',false)?' checked':''}> フォルダにまとめる<small>（枠ごとに分ける型は、いつもまとめます）</small></label>
     <p class="note" style="margin-top:10px">合わない問いは「次」で飛ばせます。答えた問いだけがトークに残ります。</p>`);
   const drawSubs=()=>{sh.querySelector('.qsc').innerHTML=[['all','すべて'],...QSUB].map(([k,l])=>`<span class="chip${subs.includes(k)?' on':''}" data-s="${k}">${l}</span>`).join('');
     sh.querySelectorAll('[data-s]').forEach(c=>c.onclick=()=>{const k=c.dataset.s;
       if(k==='all')subs=['all'];else{subs=subs.filter(x=>x!=='all');subs=subs.includes(k)?subs.filter(x=>x!==k):[...subs,k];if(!subs.length)subs=['gen']}
       LS.set('qsubs',subs);drawSubs()})};
   drawSubs();
+  const bindM=()=>sh.querySelectorAll('[data-m]').forEach(b=>b.onclick=e=>{if(e.target.closest('[data-fav]'))return;const fold=sh.querySelector('#mFold').checked;LS.set('mfold',fold);closeSheet();mStart(b.dataset.m,rid,fold)});
+  const drawAll=()=>{const fav=new Set(mFav());sh.querySelector('.mall').innerHTML=`<div class="mlist">${MC.map(c=>`<div class="mfrow">${mRow(c)}<span class="mfav${fav.has(c.id)?' on':''}" data-fav="${c.id}" title="お気に入り">${fav.has(c.id)?'★':'☆'}</span></div>`).join('')}</div>`;
+    sh.querySelectorAll('[data-fav]').forEach(s=>s.onclick=e=>{e.stopPropagation();const id=s.dataset.fav;const f=mFav();LS.set('mfav',f.includes(id)?f.filter(x=>x!==id):[...f,id]);drawAll()});bindM()};
+  sh.querySelector('[data-x=more]').onclick=e=>{e.target.remove();sh.querySelector('.mall').classList.remove('hidden');drawAll()};
+  bindM();
   sh.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{closeSheet();qShow(rid,b.dataset.f,b.dataset.f==='dump'?subs:[])});
 }
 async function qStatsCopy(){
   const s=LS.get('qstats',{});const rows=QS.map(q=>{const a=s[q.id]||[0,0,0];return {q,sh:a[0],sk:a[1],an:a[2]}}).filter(r=>r.sh);
   rows.sort((a,b)=>(b.sk/b.sh)-(a.sk/a.sh)||b.sh-a.sh);
-  const txt=`NSNS 問いの統計（${ymd(now())}・この端末）\n表示した問い ${rows.length}/${QS.length}\n`+rows.map(r=>`#${r.q.id} 表示${r.sh} 次${r.sk} 答${r.an}｜${QFK[r.q.f].t}${r.q.sub?'・'+QSUBL[r.q.sub]:''}｜${r.q.t}`).join('\n');
+  const mu=LS.get('mstats',{});const ml=Object.entries(mu).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k} ${MCB.get(k)?.n||''} 開始${v}`);
+  const txt=`NSNS 問いの統計（${ymd(now())}・この端末）\n表示した問い ${rows.length}/${QS.length}\n`+rows.map(r=>`#${r.q.id} 表示${r.sh} 次${r.sk} 答${r.an}｜${QFK[r.q.f].t}${r.q.sub?'・'+QSUBL[r.q.sub]:''}｜${r.q.t}`).join('\n')+(ml.length?`\n\n思考法\n${ml.join('\n')}`:'');
   try{await navigator.clipboard.writeText(txt);toast('問いの統計をコピーしました')}catch(e){openSheet(`<h3>問いの統計</h3><textarea class="inp" style="width:100%;height:50vh">${esc(txt)}</textarea>`)}
 }
+
+/* ---------- アナウンス（固定したメモ）とAIのおすすめ ---------- */
+function annHTML(r){
+  const pins=roomMsgs(r.id).filter(m=>m.pinned&&m.by!=='ai');const rec=(r.rec||[]).filter(x=>MCB.has(x.m));
+  let h='';
+  if(pins.length){const l=pins[pins.length-1];h+=`<div class="annc" data-act="annJump" data-id="${l.id}"><span class="ai">📢</span><span class="at">${esc(flat(l.text||'📷 画像').slice(0,80))}</span>${pins.length>1?`<span class="an">他${pins.length-1}件</span>`:''}</div>`}
+  if(rec.length)h+=`<div class="annc rec" data-act="qSheet"><span class="ai">🧭</span><span class="at">おすすめ：${rec.map(x=>esc(MCB.get(x.m).n)).join('・')}</span></div>`;
+  return h;
+}
+function annJump(el){const pins=roomMsgs(S.roomId).filter(m=>m.pinned&&m.by!=='ai');if(!pins.length)return;
+  const cur=el.dataset.id;const i=pins.findIndex(m=>m.id===cur);const target=pins[i>0?i-1:pins.length-1];
+  S.jump=cur;renderChat();el.dataset.id=target.id}
+async function togglePin(m){m.pinned=!m.pinned;await saveMsg(m);renderRoom(true);toast(m.pinned?'アナウンスにしました':'アナウンスを外しました')}
+
+/* ---------- メモをトークにする ---------- */
+async function msgToRoom(m){
+  const src=S.nodes.get(m.roomId);if(!src||m.by==='ai')return;const pid=src.parentId||null;
+  const first=(m.text||'').split('\n').map(s=>s.trim()).find(Boolean);
+  const name=uniqName(first?first.replace(/#\S+/g,'').trim().slice(0,20)||first.slice(0,20):`${dayLabel(m.createdAt)}の画像`,pid);
+  const r=mkRoom(pid,name,null,{lastAt:m.createdAt});const old=m.roomId;
+  await insertAfter(src,[r],pid);m.roomId=r.id;await saveMsg(m);await fixLastAt(old);await fixLastAt(r.id);
+  renderList();renderRoom(true);
+  toast(`「${r.name}」をトークにしました`,'取り消す',async()=>{m.roomId=old;await saveMsg(m);await fixLastAt(old);await moveToTrash([r],[],new Set([r.id]));renderList();renderRoom(true)});
+}
+
+/* ---------- メモの左スワイプ（右側にボタン） ---------- */
+const MSW={el:null,x:0,y:0,dx:0,on:false,open:null};
+function mswClose(){if(MSW.open){MSW.open.classList.remove('sw');MSW.open.querySelector('.line').style.transform='';MSW.open=null}}
+document.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='mouse'||S.sel)return;const el=e.target.closest('#chat .msg[data-lpm]:not(.ai)');
+  if(MSW.open&&!e.target.closest('.swact')){mswClose()}
+  if(!el)return;MSW.el=el;MSW.x=e.clientX;MSW.y=e.clientY;MSW.dx=0;MSW.on=false},true);
+document.addEventListener('pointermove',e=>{if(!MSW.el)return;const dx=e.clientX-MSW.x,dy=e.clientY-MSW.y;
+  if(!MSW.on){if(Math.abs(dy)>10){MSW.el=null;return}if(dx<-12&&Math.abs(dx)>Math.abs(dy)*1.5){MSW.on=true;clearTimeout(lp.t);lp.t=null}else return}
+  MSW.dx=Math.max(-130,Math.min(0,dx));MSW.el.querySelector('.line').style.transform=`translateX(${MSW.dx}px)`},true);
+['pointerup','pointercancel'].forEach(ev=>document.addEventListener(ev,()=>{if(!MSW.el)return;const el=MSW.el;MSW.el=null;if(!MSW.on)return;
+  G.suppress=true;setTimeout(()=>{G.suppress=false},350);
+  if(MSW.dx<-60){mswClose();el.classList.add('sw');el.querySelector('.line').style.transform='translateX(-118px)';MSW.open=el}
+  else el.querySelector('.line').style.transform=''},true));
 
 /* =========================================================
    NAV & EVENTS
@@ -1925,7 +2162,7 @@ const ACT={
     l.length===1?{icon:'✎',label:'編集',fn:()=>ACT.selEdit()}:null,
     {icon:'⧉',label:'コピー',fn:()=>ACT.selCopy()},
     {icon:anyNew?'✓':'○',label:anyNew?'書き出し済みにする':'未書き出しに戻す',fn:()=>ACT.selMark()},
-    {icon:'📌',label:l.every(m=>m.pinned)?'ピンを外す':'ピン留め',fn:async()=>{const on=!l.every(m=>m.pinned);l.forEach(m=>m.pinned=on);await saveMsgs(l);selExit()}},
+    {icon:'📢',label:l.every(m=>m.pinned)?'アナウンスを外す':'アナウンスにする',fn:async()=>{const on=!l.every(m=>m.pinned);l.forEach(m=>m.pinned=on);await saveMsgs(l);selExit()}},
   ])},
   nodeMenu:(el,e)=>{e.stopPropagation();nodeMenu(el.dataset.id)},
   exportHere:()=>openExport({scope:S.cwd?[S.cwd]:[]}),
@@ -1934,7 +2171,8 @@ const ACT={
   pickImg:()=>$('#fileImg').click(),
   rmPending:el=>{S.pending.splice(+el.dataset.i,1);renderPending()},
   send:sendMsg,
-  qSheet:()=>qSheet(),qNext:()=>qNext(),qEnd:()=>qEnd(),qAuto:()=>qAuto(),
+  qSheet:()=>qSheet(),qNext:()=>qNext(),qEnd:()=>qEnd(),qAuto:()=>qAuto(),mEnough:()=>mEnough(),annJump:el=>annJump(el),
+  msgAnn:el=>{mswClose();const m=S.msgs.get(el.dataset.id);if(m)togglePin(m)},msgRoom:el=>{mswClose();const m=S.msgs.get(el.dataset.id);if(m)msgToRoom(m)},
   loadMore:()=>{const c=$('#chat');const h=c.scrollHeight;S.win+=200;renderChat(false);c.scrollTop=c.scrollHeight-h},
   tapMsg:(el,e)=>{if(e.target.closest('a'))return;if(S.sel)selToggle(el.dataset.id)},
   msgMenu:(el,e)=>{e.stopPropagation();msgMenu(el.dataset.id)},
