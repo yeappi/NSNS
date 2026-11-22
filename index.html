@@ -428,6 +428,33 @@ details.adv .in{padding:0 14px 14px}
 .msg.sw .swact{display:flex}
 .swact button{display:flex;flex-direction:column;align-items:center;justify-content:center;width:54px;padding:6px 2px;border-radius:12px;background:#fff;box-shadow:0 1px 3px rgba(60,40,20,.12);font-size:10px;color:#5F5850}
 .swact button span{font-size:17px;line-height:1.2}
+
+/* ナビ・inbox・データ */
+.bnav{flex:none;display:flex;border-top:1px solid var(--line);background:var(--bg);padding:4px 6px calc(4px + var(--safe-b))}
+.bnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 0;font-size:11px;color:var(--sub);border-radius:12px}
+.bnav button .ic{font-size:20px;line-height:1.2;filter:grayscale(1);opacity:.6}
+.bnav button.on{color:var(--accent-ink);font-weight:700}
+.bnav button.on .ic{filter:none;opacity:1}
+#listPane.hasnav .fab{bottom:calc(84px + var(--safe-b))}
+#listPane .scroll{flex:1}
+#app.keyboard-visible .bnav{display:none}
+.ibox{flex:1;display:flex;flex-direction:column;min-height:0;padding:4px 14px 0}
+.ibox textarea{flex:1;min-height:120px;width:100%;resize:none;border:0;outline:none;background:#fff;border-radius:18px;padding:14px 16px;font-size:17px;line-height:1.6;box-shadow:0 1px 2px rgba(60,40,20,.06)}
+.iblast{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--sub);padding:4px 4px 8px;cursor:pointer;transition:color .3s}
+.iblast span{margin-left:auto;flex:none;color:var(--accent-ink)}
+.iblast.pop{color:var(--accent-ink)}
+.ibq{display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:8px 8px 8px 14px;border-radius:14px;background:#FFF4E2;color:#7A5A2E;font-size:14px}
+.ibq .t{flex:1;cursor:pointer}
+.ibq button{padding:5px 10px;border-radius:10px;font-size:12px;background:rgba(255,255,255,.7);color:#7A5A2E}
+.ibqoff{align-self:flex-start;margin-bottom:8px;font-size:12px;color:var(--sub);padding:4px 10px;border-radius:10px;background:#F1ECE6}
+.ibsend{flex:none;display:flex;justify-content:center;padding:10px 0 12px}
+.ibbtn{display:flex;align-items:center;gap:8px;padding:12px 26px;border-radius:22px;background:var(--accent);color:#fff;font-weight:700;box-shadow:0 6px 18px rgba(236,140,105,.35);transition:opacity .15s}
+.ibbtn:disabled{opacity:.4;box-shadow:none}
+.ibbtn svg{width:18px;height:18px;stroke:#fff;stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.lvhost{padding:0 12px 20px}
+.fcnt{flex:none;font-size:11px;color:var(--sub);white-space:nowrap}
+.fcnt b{font-weight:600;color:#5E8A4F}
+.fv{font-size:12px;margin-right:3px}
 </style>
 </head>
 <body>
@@ -665,7 +692,9 @@ function firstGrapheme(v){v=(v||'').trim();if(!v)return '';try{if(window.Intl&&I
    ========================================================= */
 function renderList(){
   S.swiped=null;
-  const P=$('#listPane');const cwd=S.cwd?S.nodes.get(S.cwd):null;if(S.cwd&&!cwd)S.cwd=null;
+  const P=$('#listPane');P.classList.toggle('hasnav',!S.lsel);
+  if(!S.lsel&&S.tab==='inbox')return renderInbox(P);
+  if(!S.lsel&&S.tab==='data')return renderData(P);const cwd=S.cwd?S.nodes.get(S.cwd):null;if(S.cwd&&!cwd)S.cwd=null;
   const selBtn=`<button class="icon" data-act="lselStart" title="まとめて選択">${ICONS.check}</button>`;
   let head;
   if(S.lsel){
@@ -685,7 +714,6 @@ function renderList(){
   }else{
     head=`<div class="top"><div class="brand">NSNS <small>Not SNS</small></div>
       <button class="icon" data-act="toggleSearch" title="検索">${ICONS.search}</button>
-      <button class="icon" data-act="listView" title="一覧（種類・ピンで絞る）">${ICONS.list}</button>
       ${selBtn}
       <button class="icon" data-act="exportHere" title="書き出す">${ICONS.out}</button>
       <button class="icon" data-act="settings" title="設定">${ICONS.gear}</button></div>`;
@@ -697,7 +725,7 @@ function renderList(){
       <button data-act="lselGroup" ${n?'':'disabled'}><span class="ic">📁</span>まとめる</button>
       <button data-act="lselMove" ${n?'':'disabled'}><span class="ic">⇢</span>移動</button>
       <button data-act="lselDelete" ${n?'':'disabled'} style="color:#C9583F"><span class="ic">🗑</span>削除</button></div>`
-    :`<button class="fab" data-act="newMenu" title="追加">${ICONS.plus}</button>`;
+    :`<button class="fab" data-act="newMenu" title="追加">${ICONS.plus}</button>`+navHTML();
   P.innerHTML=head+`<div class="scroll" id="listScroll"></div>`+bottom;
   fillListBody();
   const qi=$('#q');if(qi){qi.oninput=e=>{S.search=e.target.value;fillListBody()}}
@@ -722,11 +750,17 @@ function fillListBody(){
     if(msgHits.length)html+=`<div class="sectlabel">メモ</div><ul class="list">${msgHits.map(m=>itemHTML(S.nodes.get(m.roomId),{path:true,msg:m,q})).join('')}</ul>`;
     if(!html)html=`<div class="empty">見つかりませんでした</div>`;
   }else{
-    const all=sortNodes(kids(S.cwd)),arch=all.filter(n=>n.archived);
+    let all=sortNodes(kids(S.cwd));let top='';
+    if(!S.cwd){const ib=getInbox();all=all.filter(n=>n!==ib&&!n.fav);
+      top=ib?itemHTML(ib,{fixed:true}):`<li class="iw" data-static="1"><div class="item" data-act="openInbox">${avatar({name:'inbox',emoji:'📥',color:PALETTE[5]})}<div class="mid"><div class="nmrow"><div class="nm">inbox</div></div><div class="pv">思いついたことを、まずここへ</div></div></div></li>`;
+      const favs=sortNodes([...S.nodes.values()].filter(n=>n.fav&&!n.inbox));top+=favs.map(n=>itemHTML(n,{fav:true,path:!!n.parentId})).join('')}
+    const arch=all.filter(n=>n.archived);
     const items=all.filter(n=>!n.archived).map(n=>itemHTML(n));
-    if(items.length)html=backupReminder()+`<ul class="list"${arch.length?' style="padding-bottom:4px"':''}>${items.join('')}</ul>`;
-    else if(!arch.length&&!S.cwd&&S.nodes.size===0)html=`<div class="empty"><div class="big">🫧</div><p>まだ何もありません</p><p>右下の ＋ からトークをつくって、<br>思いついたことをどんどん投げ込もう。</p><p style="margin-top:22px"><button class="btn" style="padding:0 18px;flex:none" data-act="seed">サンプルで試す</button></p></div>`;
-    else if(!arch.length)html=`<div class="empty"><p>からっぽです</p><p>＋ でトークやフォルダを追加</p></div>`;
+    if(items.length||top)html=backupReminder()+`<ul class="list"${arch.length||!items.length?' style="padding-bottom:4px"':''}>${top}${items.join('')}</ul>`;
+    if(!items.length&&!arch.length){
+      if(!S.cwd&&S.nodes.size<=1)html+=`<div class="empty" style="padding-top:20px"><p>右下の ＋ からトークをつくって、<br>思いついたことをどんどん投げ込もう。</p><p style="margin-top:22px"><button class="btn" style="padding:0 18px;flex:none" data-act="seed">サンプルで試す</button></p></div>`;
+      else if(S.cwd)html=`<div class="empty"><p>からっぽです</p><p>＋ でトークやフォルダを追加</p></div>`;
+    }
     if(arch.length){
       html+=`<button class="trashrow" data-act="toggleArch" style="margin-top:6px">🗄 アーカイブ（${arch.length}）${S.showArch?'　▲':'　▼'}</button>`;
       if(S.showArch)html+=`<ul class="list" style="padding-bottom:4px">${arch.map(n=>itemHTML(n)).join('')}</ul>`;
@@ -745,11 +779,12 @@ function itemHTML(n,o={}){
   const sel=!!S.lsel&&!o.msg;
   const tg=n.tags||[];
   const tags=tg.length?`<span class="tgs">${tg.slice(0,2).map(x=>`<span>#${esc(x)}</span>`).join('')}${tg.length>2?`<span>+${tg.length-2}</span>`:''}</span>`:'';
-  return `<li class="iw" data-nid="${n.id}"${o.msg?' data-static="1"':''}>
+  const fc=n.type==='folder'&&!o.msg?folderCounts(n):'';
+  return `<li class="iw" data-nid="${n.id}"${o.msg||o.fixed?' data-static="1"':''}>
     ${o.msg||sel?'':`<div class="acts"><button data-act="swEdit" data-id="${n.id}"><span class="i">✎</span>編集</button><button data-act="swMore" data-id="${n.id}"><span class="i">⋯</span>その他</button><button class="del" data-act="swDel" data-id="${n.id}"><span class="i">🗑</span>削除</button></div>`}
     <div class="item${n.archived?' arch':''}${n.id===S.roomId&&!o.msg?' active':''}${sel&&S.lsel.has(n.id)?' sel':''}" data-act="open" data-id="${n.id}"${o.msg?` data-msg="${o.msg.id}"`:''}>
       ${sel?'<span class="lck"></span>':''}${avatar(n)}
-      <div class="mid"><div class="nmrow"><div class="nm">${esc(n.name)}</div>${tags}</div><div class="pv">${esc(pv)}</div></div>
+      <div class="mid"><div class="nmrow"><div class="nm">${o.fav?'<span class="fv">⭐</span>':''}${esc(n.name)}</div>${fc}${tags}</div><div class="pv">${esc(pv)}</div></div>
       <div class="rt"><div class="tm">${t?fmtTime(t):''}</div>${un?`<span class="badge" title="未書き出し">${un>99?'99+':un}</span>`:'<span style="height:20px"></span>'}</div>
       ${o.msg||sel?'':`<button class="more" data-act="nodeMenu" data-id="${n.id}" title="メニュー">${ICONS.more}</button>`}
     </div></li>`;
@@ -1004,20 +1039,22 @@ function newNode(type){editNodeSheet({id:uid(),type,parentId:S.cwd,name:'',emoji
 
 function nodeMenu(id){
   const n=S.nodes.get(id);if(!n)return;
+  const ib=isInbox(n);
   menuSheet(n.name,[
+    ib?null:{icon:n.fav?'☆':'⭐',label:n.fav?'お気に入りから外す':'お気に入り',sub:n.fav?'':'ホームの上（inboxの下）に並びます',fn:async()=>{n.fav=!n.fav;await saveNode(n);renderList()}},
     n.type==='room'?{toggle:true,icon:'💬',label:'相槌',sub:'メモを送ると、ひとこと返事します',on:!!n.aizuchi,fn:async on=>{n.aizuchi=on;await saveNode(n);if(!on){clearTimeout(aizT);aizT=null;setTyping(null)}toast(on?'相槌をオンにしました':'相槌をオフにしました')}}:null,
     {icon:'✎',label:'名前・アイコン・タグを編集',fn:()=>editNodeSheet(n)},
     {icon:'↗',label:'ここから書き出す',fn:()=>openExport({scope:[n.id]})},
     {icon:'🤖',label:'AIで整理する',sub:'分類・次の問い・資料化',fn:()=>aiNodeMenu(n)},
-    n.type==='room'&&!n.docs?{icon:'🗄',label:n.archived?'アーカイブから戻す':'アーカイブする',sub:n.archived?'':'一覧の下にしまう。検索には出ます',fn:()=>setArchived([n],!n.archived)}:null,
-    {icon:'⇢',label:'移動する',fn:()=>moveSheet(n)},
+    n.type==='room'&&!n.docs&&!ib?{icon:'🗄',label:n.archived?'アーカイブから戻す':'アーカイブする',sub:n.archived?'':'一覧の下にしまう。検索には出ます',fn:()=>setArchived([n],!n.archived)}:null,
+    ib?null:{icon:'⇢',label:'移動する',fn:()=>moveSheet(n)},
     n.type==='room'?{icon:n.badge?'○':'●',label:n.badge?'バッジを出さない':'未書き出しバッジを出す',fn:async()=>{n.badge=!n.badge;await saveNode(n);renderList()}}:null,
     {icon:'↺',label:'書き出し済みの印をすべて外す',fn:async()=>{const set=new Set(n.type==='room'?[n.id]:descendants(n.id).filter(d=>d.type==='room').map(d=>d.id));const ch=[...S.msgs.values()].filter(m=>set.has(m.roomId)&&m.exportedAt);ch.forEach(m=>{m.exportedAt=null;m.exportId=null});await saveMsgs(ch);renderList();renderChat();toast(`${ch.length}件の印を外しました`)}},
-    {icon:'🗑',label:'ごみ箱へ',sub:'90日間は元に戻せます',danger:true,fn:()=>deleteNodes([n])},
+    ib?null:{icon:'🗑',label:'ごみ箱へ',sub:'90日間は元に戻せます',danger:true,fn:()=>deleteNodes([n])},
   ]);
 }
 async function deleteNodes(list){
-  list=list.filter(n=>S.nodes.has(n.id));if(!list.length)return;
+  list=list.filter(n=>S.nodes.has(n.id)&&!isInbox(n));if(!list.length)return;
   const all=new Map();list.forEach(n=>{all.set(n.id,n);if(n.type==='folder')descendants(n.id).forEach(d=>all.set(d.id,d))});
   const rooms=new Set([...all.values()].filter(x=>x.type==='room').map(x=>x.id));
   const msgs=[...S.msgs.values()].filter(m=>rooms.has(m.roomId));
@@ -1031,6 +1068,7 @@ async function deleteNodes(list){
 function treeRows(pid,depth,o){let out=[];[...kids(pid)].filter(k=>k.type==='folder'||o.rooms).sort((a,b)=>(a.type===b.type?0:a.type==='folder'?-1:1)||a.name.localeCompare(b.name,'ja')).forEach(k=>{out.push(o.row(k,depth));if(k.type==='folder')out=out.concat(treeRows(k.id,depth+1,o))});return out}
 function moveSheet(n){moveNodesSheet([n])}
 function moveNodesSheet(list,onDone){
+  list=list.filter(n=>!isInbox(n));if(!list.length)return;
   const bad=new Set();list.forEach(n=>{bad.add(n.id);if(n.type==='folder')descendants(n.id).forEach(d=>bad.add(d.id))});
   let target=list.length===1?(list[0].parentId||''):(S.cwd||'');
   const rows=[`<div class="row ${!target?'on':''}" data-t=""><span class="ck">✓</span>🏠 ホーム（いちばん上）</div>`].concat(treeRows(null,0,{row:(k,d)=>`<div class="row ${bad.has(k.id)?'dis':''} ${k.id===target?'on':''}" data-t="${k.id}" style="padding-left:${8+d*20}px"><span class="ck">✓</span>${avatar(k,true)}<span>${esc(k.name)}</span></div>`}));
@@ -1491,11 +1529,13 @@ function lvCollect(){
   }
   return out.sort((a,b)=>(!!b.pinned-!!a.pinned)||(b.createdAt-a.createdAt));
 }
-function listView(){
-  const sh=openSheet(`<div class="shead"><h3>一覧</h3><button data-l="aimenu">🤖 AI</button></div>
+function listView(host){
+  const inner=`<div class="shead"><h3>一覧</h3><button data-l="aimenu">🤖 AI</button></div>
     <div class="searchbox" style="margin:0 0 10px">${ICONS.search}<input id="lvQ" placeholder="本文で探す"></div>
     <div class="lvopts"><div class="chips" id="lvK"></div><div class="chips" id="lvS"></div><div class="chips" id="lvT"></div></div>
-    <div class="stat" id="lvStat"></div><div class="lv" id="lvList"></div>`,{full:true});
+    <div class="stat" id="lvStat"></div><div class="lv" id="lvList"></div>`;
+  let sh;if(host){host.innerHTML=inner;sh=host}else sh=openSheet(inner,{full:true});
+  const closeLV=()=>{if(!host)closeSheet(sh.parentElement)};
   const q=x=>sh.querySelector(x);let cur=[];
   const save=()=>LS.set('lv',LV);
   const tgl=(arr,v)=>arr.includes(v)?arr.filter(x=>x!==v):[...arr,v];
@@ -1528,11 +1568,11 @@ function listView(){
       case 't':LV.tag=LV.tag===v?'':v;all();break;
       case 'pin1':{e.stopPropagation();const m=S.msgs.get(el.dataset.id);if(!m)break;m.pinned=!m.pinned;await saveMsg(m);drawList();if(S.roomId===m.roomId)renderChat();break}
       case 'cls':{e.stopPropagation();const m=S.msgs.get(el.dataset.id);if(m)classifySheet([m],()=>{if(S.roomId===m.roomId)renderChat()});break}
-      case 'open':{const m=S.msgs.get(el.dataset.id);if(!m)break;closeSheet(sh.parentElement);openRoom(m.roomId,m.id);break}
+      case 'open':{const m=S.msgs.get(el.dataset.id);if(!m)break;closeLV();openRoom(m.roomId,m.id);break}
       case 'aimenu':{const l=cur.filter(m=>m.by!=='ai');menuSheet(`この一覧（${l.length}件）`,[
         {icon:'🏷',label:'AIで分類する',sub:'未分類だけ渡すなら、先に「未分類」で絞る',fn:()=>copyPrompt('classify',{msgs:l})},
         {icon:'🧠',label:'AIでブレストする',sub:'論点ごとにトークを作り、問いを立ててもらう',fn:()=>copyPrompt('brainstorm',{msgs:l})},
-        {icon:'↗',label:'この一覧を書き出す',fn:()=>{if(!l.length)return;closeSheet(sh.parentElement);openExport({ids:l.map(m=>m.id)})}},
+        {icon:'↗',label:'この一覧を書き出す',fn:()=>{if(!l.length)return;closeLV();openExport({ids:l.map(m=>m.id)})}},
         {icon:'📥',label:'AIの結果を取り込む',fn:()=>importSheet()},
       ]);break}
     }
@@ -2044,7 +2084,7 @@ async function ensureFolder(src,iid,moved){
   src.parentId=f.id;src.order=0;await saveNodes([f,...sibs.filter(x=>x!==f),src]);return f;
 }
 const uniqName=(base,pid)=>{const names=new Set(kids(pid).map(k=>k.name));if(!names.has(base))return base;let i=2;while(names.has(`${base} ${i}`))i++;return `${base} ${i}`};
-function mkRoom(pid,name,color,extra){return Object.assign({id:uid(),type:'room',parentId:pid,name:name.slice(0,60),emoji:'',color:color||PALETTE[Math.floor(Math.random()*7)],tags:[],badge:true,order:0,createdAt:now(),lastAt:now()},extra||{})}
+function mkRoom(pid,name,color,extra){if(extra&&extra.mrun)extra.qroom=true;return Object.assign({id:uid(),type:'room',parentId:pid,name:name.slice(0,60),emoji:'',color:color||PALETTE[Math.floor(Math.random()*7)],tags:[],badge:true,order:0,createdAt:now(),lastAt:now()},extra||{})}
 async function mStart(mid,rid,fold){
   const c=MCB.get(mid),src=S.nodes.get(rid);if(!c||!src)return;
   const needF=c.rm!=='one'||fold;let pid=src.parentId||null,base=src.name;
@@ -2136,6 +2176,67 @@ document.addEventListener('pointermove',e=>{if(!MSW.el)return;const dx=e.clientX
   else el.querySelector('.line').style.transform=''},true));
 
 /* =========================================================
+   ナビ（メモ／inbox／データ）・inbox・お気に入り
+   ========================================================= */
+S.tab=LS.get('tab','memo');if(!['memo','inbox','data'].includes(S.tab))S.tab='memo';
+const getInbox=()=>{let b=null;S.nodes.forEach(n=>{if(n.inbox&&(!b||n.createdAt<b.createdAt))b=n});return b};
+async function ensureInbox(){let b=getInbox();if(b)return b;
+  b={id:uid(),type:'room',parentId:null,name:'inbox',emoji:'📥',color:PALETTE[5],tags:[],badge:false,inbox:true,order:-1,createdAt:now(),lastAt:now()};
+  await saveNode(b);return b}
+const isInbox=n=>!!(n&&n.inbox&&getInbox()===n);
+function navHTML(){
+  const it=[['memo','💬','メモ'],['inbox','📥','inbox'],['data','📊','データ']];
+  return `<nav class="bnav">${it.map(([k,ic,l])=>`<button class="${S.tab===k?'on':''}" data-act="tab" data-t="${k}"><span class="ic">${ic}</span>${l}</button>`).join('')}</nav>`;
+}
+function setTab(t){S.tab=t;LS.set('tab',t);S.lsel=null;S.searchOpen=false;renderList();if(t==='inbox')setTimeout(()=>{if(!isTouch())$('#ibta')?.focus()},50)}
+/* ---- inbox タブ：書くだけの画面。部屋は開かない ---- */
+S.ibq=null;
+function ibDraw(){if(!LS.get('ibq',true)){S.ibq=null;return}const id=qDraw('dump',qSubs());S.ibq=id==null?null:{cur:id};if(S.ibq)qStat(id,0)}
+function ibLastHTML(){const b=getInbox();if(!b)return '';const ms=roomMsgs(b.id).filter(m=>m.by!=='ai');const l=ms[ms.length-1];
+  return l?`<div class="iblast" data-act="openInbox">直前：${esc(flat(l.text||'📷 画像').slice(0,60))}<span>inboxを開く ›</span></div>`:''}
+function ibQHTML(){if(!LS.get('ibq',true))return `<button class="ibqoff" data-act="ibQToggle">💡 問いを出す</button>`;
+  if(!S.ibq)ibDraw();const q=S.ibq&&QBY.get(S.ibq.cur);
+  return q?`<div class="ibq"><span class="t" data-act="ibNextQ">💡 ${esc(q.t)}</span><button data-act="ibNextQ" title="次の問い">次</button><button data-act="ibQToggle" title="問いを出さない">✕</button></div>`:''}
+function renderInbox(P){
+  P.innerHTML=`<div class="top"><div class="brand">inbox <small>思いついたら、ここに</small></div>
+      <button class="icon" data-act="openInbox" title="inboxを開く">${ICONS.list}</button></div>
+    <div class="ibox"><div id="ibLast">${ibLastHTML()}</div><div id="ibQ">${ibQHTML()}</div>
+      <textarea id="ibta" placeholder="なんでも書いていい"></textarea></div>
+    <div class="ibsend"><button class="ibbtn" id="ibSend" data-act="ibSend" disabled>${ICONS.send}<span>inboxに送る</span></button></div>`+navHTML();
+  const ta=$('#ibta');ta.value=LS.get('draft:__inbox','');
+  const upd=()=>{$('#ibSend').disabled=!ta.value.trim()};upd();
+  ta.addEventListener('input',()=>{LS.set('draft:__inbox',ta.value);upd()});
+  ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229&&!isTouch()){e.preventDefault();ibSend()}});
+}
+async function ibSend(){
+  const ta=$('#ibta');if(!ta)return;const text=ta.value.replace(/\s+$/,'');if(!text.trim())return;
+  const b=await ensureInbox();const t=now();
+  if(S.ibq){const q=QBY.get(S.ibq.cur);if(q){await saveMsg({id:uid(),roomId:b.id,text:q.t,images:[],createdAt:t-1,exportedAt:null,exportId:null,by:'ai',qid:q.id});qStat(q.id,2)}}
+  const m={id:uid(),roomId:b.id,text,images:[],createdAt:t,exportedAt:null,exportId:null};
+  await saveMsg(m);b.lastAt=t;await saveNode(b);
+  ta.value='';LS.set('draft:__inbox','');$('#ibSend').disabled=true;
+  if(S.ibq)ibDraw();
+  $('#ibLast').innerHTML=ibLastHTML();$('#ibQ').innerHTML=ibQHTML();
+  const l=$('#ibLast .iblast');if(l){l.classList.add('pop');setTimeout(()=>l.classList.remove('pop'),600)}
+  if(!isTouch())ta.focus();
+}
+function ibNextQ(){if(S.ibq)qStat(S.ibq.cur,1);ibDraw();$('#ibQ').innerHTML=ibQHTML()}
+function ibQToggle(){const on=!LS.get('ibq',true);LS.set('ibq',on);S.ibq=null;$('#ibQ').innerHTML=ibQHTML()}
+async function openInbox(){const b=await ensureInbox();S.tab='memo';LS.set('tab','memo');S.cwd=null;openRoom(b.id)}
+/* ---- データ タブ：一覧をそのまま埋め込む ---- */
+function renderData(P){
+  P.innerHTML=`<div class="top"><div class="brand">データ <small>メモを横断して見る</small></div></div><div class="scroll" id="dataScroll"><div class="lvhost"></div></div>`+navHTML();
+  listView(P.querySelector('.lvhost'));
+}
+/* ---- フォルダの中身の数・問いの進み具合 ---- */
+function folderCounts(n){
+  const ks=kids(n.id);let r=0,f=0,a=0,qt=0,qa=0;
+  for(const k of ks){if(k.type==='folder'){f++;continue}if(k.archived){a++;continue}r++;
+    if(k.qroom||k.mrun){qt++;if(roomMsgs(k.id).some(m=>m.by!=='ai'))qa++}}
+  return `<span class="fcnt">${r?`💬${r}`:''}${f?` 📁${f}`:''}${a?` 🗄${a}`:''}${qt?` <b>✅${qa}/${qt}</b>`:''}</span>`;
+}
+
+/* =========================================================
    NAV & EVENTS
    ========================================================= */
 function openRoom(id,msgId){S.roomId=id;S.pending=[];S.sel=null;S.win=200;S.jump=msgId||null;document.body.classList.add('in-room');renderRoom();renderList();setTimeout(()=>{if(!isTouch()&&!msgId)$('#ta')?.focus()},50)}
@@ -2171,6 +2272,7 @@ const ACT={
   pickImg:()=>$('#fileImg').click(),
   rmPending:el=>{S.pending.splice(+el.dataset.i,1);renderPending()},
   send:sendMsg,
+  tab:el=>setTab(el.dataset.t),openInbox:()=>openInbox(),ibSend:()=>ibSend(),ibNextQ:()=>ibNextQ(),ibQToggle:()=>ibQToggle(),
   qSheet:()=>qSheet(),qNext:()=>qNext(),qEnd:()=>qEnd(),qAuto:()=>qAuto(),mEnough:()=>mEnough(),annJump:el=>annJump(el),
   msgAnn:el=>{mswClose();const m=S.msgs.get(el.dataset.id);if(m)togglePin(m)},msgRoom:el=>{mswClose();const m=S.msgs.get(el.dataset.id);if(m)msgToRoom(m)},
   loadMore:()=>{const c=$('#chat');const h=c.scrollHeight;S.win+=200;renderChat(false);c.scrollTop=c.scrollHeight-h},
