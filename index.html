@@ -377,8 +377,9 @@ details.adv .in{padding:0 14px 14px}
 .impsum b{color:var(--accent-ink)}
 
 /* 問いかけ */
+#qwrap{flex:none}
 .qbtn{font-size:19px}
-.qband{display:flex;align-items:center;gap:6px;margin:-2px 0 8px;padding:5px 6px 5px 12px;border-radius:12px;background:#FFF4E2;font-size:12.5px;color:#7A5A2E}
+.qband{flex:none;display:flex;align-items:center;gap:6px;margin:6px 10px 0;padding:5px 6px 5px 12px;border-radius:12px;background:#FFF4E2;font-size:12.5px;color:#7A5A2E}
 .qband .qb-t{flex:1;font-weight:700;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .qband .qb-t small{font-weight:400;margin-left:6px;opacity:.8}
 .qband button{padding:5px 10px;border-radius:10px;font-size:12px;color:#7A5A2E;background:rgba(255,255,255,.7)}
@@ -755,7 +756,6 @@ function renderRoom(keepScroll){
       <button class="icon" data-act="nodeMenu" data-id="${r.id}" title="メニュー">${ICONS.more}</button></div>`;
     bottom=`<div class="composer">
       <div class="pending ${S.pending.length?'':'hidden'}" id="pending"></div>
-      ${qBandHTML()}
       <div class="crow">
         <button class="icon" data-act="pickImg" title="画像">${ICONS.img}</button>
         <button class="icon qbtn" data-act="qSheet" title="問いかけ">💡</button>
@@ -763,7 +763,7 @@ function renderRoom(keepScroll){
         <button class="send" id="sendBtn" data-act="send" disabled title="送信">${ICONS.send}</button>
       </div></div>`;
   }
-  P.innerHTML=head+`<div class="chat${S.sel?' selmode':''}" id="chat"></div>`+bottom;
+  P.innerHTML=head+(S.sel?'':`<div id="qwrap">${qBandHTML()}</div>`)+`<div class="chat${S.sel?' selmode':''}" id="chat"></div>`+bottom;
   renderChat(!keepScroll);if(keepScroll&&st!=null)$('#chat').scrollTop=st;
   if(!S.sel){
     renderPending();
@@ -1838,12 +1838,13 @@ function qStat(id,i){const s=LS.get('qstats',{});const a=s[id]||[0,0,0];a[i]++;s
 function qShow(rid,f,subs){
   const id=qDraw(f,subs);if(id==null){toast('出せる問いがありません');return}
   S.qa.set(rid,{f,subs,cur:id,answered:false});qStat(id,0);
-  if(S.roomId===rid&&!S.sel)renderRoom(true),scrollChatEnd();
+  if(S.roomId===rid&&!S.sel)qRefresh();
 }
+function qRefresh(){const w=$('#qwrap');if(w)w.innerHTML=qBandHTML();renderChat(true)}
 function scrollChatEnd(){const c=$('#chat');if(c)c.scrollTop=c.scrollHeight}
 function qNext(){const rid=S.roomId,a=S.qa.get(rid);if(!a)return;if(!a.answered)qStat(a.cur,1);qShow(rid,a.f,a.subs)}
-function qEnd(){S.qa.delete(S.roomId);renderRoom(true)}
-function qAuto(){LS.set('qauto',!LS.get('qauto',false));renderRoom(true)}
+function qEnd(){S.qa.delete(S.roomId);qRefresh()}
+function qAuto(){LS.set('qauto',!LS.get('qauto',false));qRefresh()}
 function qBandHTML(){
   const a=S.qa.get(S.roomId);if(!a)return '';const f=QFK[a.f];
   const sub=a.f==='dump'?(a.subs.includes('all')?'すべて':a.subs.map(s=>QSUBL[s]).join('・')):'';
@@ -1860,7 +1861,7 @@ function qBubbleHTML(){
 /* 送信時に呼ぶ。true を返したらメモとしては保存しない（「次」） */
 async function qOnSend(text){
   const rid=S.roomId,a=S.qa.get(rid);if(!a)return false;
-  if(/^\s*(次|つぎ)\s*$/.test(text)&&!S.pending.length){qNext();return true}
+  if(/^\s*(次|つぎ)\s*$/.test(text)&&!S.pending.length){const ta=$('#ta');if(ta){ta.value='';autoGrow(ta);updSend()}LS.set('draft:'+rid,'');qNext();return true}
   if(!a.answered){
     const q=QBY.get(a.cur);
     const qm={id:uid(),roomId:rid,text:q.t,images:[],createdAt:now()-1,exportedAt:null,exportId:null,by:'ai',qid:q.id};
