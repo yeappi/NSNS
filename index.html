@@ -345,6 +345,36 @@ details.adv .in{padding:0 14px 14px}
 #toast button{color:#FFC7B2;font-weight:700;white-space:nowrap}
 .lightbox{position:fixed;inset:0;background:rgba(20,15,10,.9);z-index:90;display:grid;place-items:center;animation:fade .15s;cursor:zoom-out}
 .lightbox img{max-width:94vw;max-height:90dvh;border-radius:8px}
+
+/* 分類・AI・一覧・アーカイブ */
+.meta .kc,.lvh .kc{background:rgba(255,255,255,.85);color:var(--accent-ink);border-radius:8px;padding:0 7px;font-weight:500}
+.meta .sc,.lvh .sc{background:#E7EFE3;color:#5C7D61;border-radius:8px;padding:0 7px}
+.meta .sc.fixed,.lvh .sc.fixed{background:#DCE8F5;color:#4A6C92}
+.meta .sc.done,.lvh .sc.done{background:#EEE9E2;color:#8A8177}
+.meta .at{color:var(--accent-ink);opacity:.8}
+.msg.ai{align-items:flex-start;margin:4px 52px 4px 0}
+.msg.ai .line{justify-content:flex-start}
+.bub.ai{background:#fff;border-radius:18px 18px 18px 6px;box-shadow:0 1px 2px rgba(60,40,20,.06);color:#4A443E}
+.bub.ai::before{content:"🤖 ";font-size:12px}
+.selmode .msg.ai{margin-left:40px}
+.item.arch{opacity:.55}
+.lv{display:flex;flex-direction:column;gap:6px;padding-bottom:10px}
+.lvc{background:var(--card);border-radius:14px;padding:9px 12px;box-shadow:var(--shadow);cursor:pointer}
+.lvh{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--sub);margin-bottom:3px}
+.lvh .rm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lvh .kc{background:var(--accent-soft)}
+.lvt{font-size:13.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.lvc.ai .lvt::before{content:"🤖 "}
+.lpin{opacity:.22;font-size:13px;padding:0 2px}
+.lpin.on{opacity:1}
+.lvopts{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.lvopts .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+.lvopts .chip{flex:none}
+.clsgrp{margin:0 0 16px}
+.clsgrp .chips{gap:6px}
+.imp textarea{min-height:150px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
+.impsum{font-size:13.5px;line-height:1.7;background:var(--card);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow);margin:10px 0}
+.impsum b{color:var(--accent-ink)}
 </style>
 </head>
 <body>
@@ -360,8 +390,12 @@ details.adv .in{padding:0 14px 14px}
 /* =========================================================
    NSNS v2 — Not SNS
    IndexedDB stores
-     nodes    {id,type:'folder'|'room',parentId,name,emoji,color,tags[],badge,pinned,createdAt,lastAt}
-     messages {id,roomId,text,images[],createdAt,exportedAt,exportId}
+     nodes    {id,type:'folder'|'room',parentId,name,emoji,color,tags[],badge,pinned,createdAt,lastAt,archived,docs}
+     messages {id,roomId,text,images[],createdAt,exportedAt,exportId,
+               kind,st,pinned,tags[],kindBy:'me'|'ai',by:'ai',aiMade,importId}
+       kind = 役割（KINDS の id / null=未分類）  st = 状態（draft/fixed/done/null）
+       by:'ai' = AIの問いかけ（左の吹き出し。書き出し・検索・分類の対象外）
+       aiMade = AIがまとめた資料（普通のメモとして扱う）
      blobs    {id,blob}
      exports  {id,at,label,count,ids[],prev{},marked,undone,inc,mode}
      presets  {id,name,F,O,createdAt}
@@ -381,7 +415,23 @@ const ICONS={
   check:IC('<rect x="4" y="4" width="16" height="16" rx="5"/><path d="M8.5 12l2.5 2.5 4.5-5"/>'),
   img:IC('<rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 9"/>'),
   send:IC('<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>'),
+  list:IC('<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>'),
 };
+
+/* 分類：役割（排他）と状態。id は固定、表示名は変えてよい */
+const KINDS=[
+  {id:'task',g:'行動',label:'タスク',ic:'☑️',desc:'やること'},
+  {id:'log',g:'出来事',label:'出来事',ic:'📅',desc:'起きたこと・日記'},
+  {id:'info',g:'知識',label:'資料',ic:'📎',desc:'資料・データ・調べた情報'},
+  {id:'idea',g:'考え',label:'アイデア',ic:'💡',desc:'思いつき・構想'},
+  {id:'question',g:'考え',label:'疑問',ic:'❓',desc:'まだ答えが出ていない問い'},
+  {id:'feeling',g:'考え',label:'感想',ic:'💭',desc:'感想・気づき・感情'},
+];
+const KIND=Object.fromEntries(KINDS.map(k=>[k.id,k]));
+const STS=[{id:'draft',label:'未確定'},{id:'fixed',label:'確定'},{id:'done',label:'完了'}];
+const STL=Object.fromEntries(STS.map(s=>[s.id,s.label]));
+const kindText=k=>KIND[k]?KIND[k].ic+KIND[k].label:'';
+const sid=m=>m.id.slice(-6);
 
 /* ---------------- utils ---------------- */
 const $=(s,el=document)=>el.querySelector(s);
@@ -468,12 +518,12 @@ function ancestors(id){const out=[];let n=S.nodes.get(id);let p=n&&n.parentId;wh
 function descendants(id){const out=[];const walk=p=>kids(p).forEach(k=>{out.push(k);if(k.type==='folder')walk(k.id)});walk(id);return out}
 function lastAt(n){const c=idx().lastAt;if(c.has(n.id))return c.get(n.id);const v=n.type==='room'?(n.lastAt||n.createdAt):Math.max(n.createdAt,...kids(n.id).map(lastAt));c.set(n.id,v);return v}
 function badgeCount(n){const c=idx().badge;if(c.has(n.id))return c.get(n.id);let v=0;
-  if(n.type==='room'){if(n.badge)for(const m of roomMsgs(n.id))if(!m.exportedAt)v++}
+  if(n.type==='room'){if(n.badge&&!n.archived)for(const m of roomMsgs(n.id))if(!m.exportedAt&&m.by!=='ai')v++}
   else kids(n.id).forEach(k=>v+=badgeCount(k));c.set(n.id,v);return v}
 function latestRoom(fid){let best=null,bt=-1;descendants(fid).forEach(d=>{if(d.type==='room'){const t=d.lastAt||0;if(t>bt){bt=t;best=d}}});return best}
 function nodeTagsDeep(rid){const c=idx().rtags;if(c.has(rid))return c.get(rid);const r=S.nodes.get(rid);const s=new Set();if(r){ancestors(rid).forEach(a=>(a.tags||[]).forEach(t=>s.add(t)));(r.tags||[]).forEach(t=>s.add(t))}const v=[...s];c.set(rid,v);return v}
-function msgTags(m){const s=new Set(nodeTagsDeep(m.roomId));hashtags(m.text).forEach(t=>s.add(t));return s}
-function allTags(){const s=new Map();const add=t=>s.set(t,(s.get(t)||0)+1);S.nodes.forEach(n=>(n.tags||[]).forEach(add));S.msgs.forEach(m=>hashtags(m.text).forEach(add));return [...s.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0])}
+function msgTags(m){const s=new Set(nodeTagsDeep(m.roomId));hashtags(m.text).forEach(t=>s.add(t));(m.tags||[]).forEach(t=>s.add(t));return s}
+function allTags(){const s=new Map();const add=t=>s.set(t,(s.get(t)||0)+1);S.nodes.forEach(n=>(n.tags||[]).forEach(add));S.msgs.forEach(m=>{if(m.by==='ai')return;hashtags(m.text).forEach(add);(m.tags||[]).forEach(add)});return [...s.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0])}
 function sortNodes(arr){return [...arr].sort((a,b)=>((a.order??0)-(b.order??0))||(lastAt(b)-lastAt(a)))}
 function nextTopOrder(pid){const ks=kids(pid);return ks.length?Math.min(...ks.map(k=>k.order??0))-1:0}
 async function saveNodes(list){list.forEach(n=>S.nodes.set(n.id,n));bump();await DB.putMany('nodes',list)}
@@ -582,6 +632,7 @@ function renderList(){
   }else{
     head=`<div class="top"><div class="brand">NSNS <small>Not SNS</small></div>
       <button class="icon" data-act="toggleSearch" title="検索">${ICONS.search}</button>
+      <button class="icon" data-act="listView" title="一覧（種類・ピンで絞る）">${ICONS.list}</button>
       ${selBtn}
       <button class="icon" data-act="exportHere" title="書き出す">${ICONS.out}</button>
       <button class="icon" data-act="settings" title="設定">${ICONS.gear}</button></div>`;
@@ -612,16 +663,21 @@ function fillListBody(){
   if(S.searchOpen&&q){
     const nodeHits=[],msgHits=[];
     S.nodes.forEach(n=>{const tagHit=q.startsWith('#')&&(n.tags||[]).some(t=>t.toLowerCase().includes(q.slice(1)));if(n.name.toLowerCase().includes(q)||tagHit)nodeHits.push(n)});
-    for(const m of S.msgs.values()){if(msgHits.length>=60)break;if((m.text||'').toLowerCase().includes(q)&&S.nodes.has(m.roomId))msgHits.push(m)}
+    for(const m of S.msgs.values()){if(msgHits.length>=60)break;if(m.by!=='ai'&&(m.text||'').toLowerCase().includes(q)&&S.nodes.has(m.roomId))msgHits.push(m)}
     msgHits.sort((a,b)=>b.createdAt-a.createdAt);
     if(nodeHits.length)html+=`<div class="sectlabel">トーク・フォルダ</div><ul class="list" style="padding-bottom:4px">${sortNodes(nodeHits).map(n=>itemHTML(n,{path:true})).join('')}</ul>`;
     if(msgHits.length)html+=`<div class="sectlabel">メモ</div><ul class="list">${msgHits.map(m=>itemHTML(S.nodes.get(m.roomId),{path:true,msg:m,q})).join('')}</ul>`;
     if(!html)html=`<div class="empty">見つかりませんでした</div>`;
   }else{
-    const items=sortNodes(kids(S.cwd)).map(n=>itemHTML(n));
-    if(items.length)html=backupReminder()+`<ul class="list">${items.join('')}</ul>`;
-    else if(!S.cwd&&S.nodes.size===0)html=`<div class="empty"><div class="big">🫧</div><p>まだ何もありません</p><p>右下の ＋ からトークをつくって、<br>思いついたことをどんどん投げ込もう。</p><p style="margin-top:22px"><button class="btn" style="padding:0 18px;flex:none" data-act="seed">サンプルで試す</button></p></div>`;
-    else html=`<div class="empty"><p>からっぽです</p><p>＋ でトークやフォルダを追加</p></div>`;
+    const all=sortNodes(kids(S.cwd)),arch=all.filter(n=>n.archived);
+    const items=all.filter(n=>!n.archived).map(n=>itemHTML(n));
+    if(items.length)html=backupReminder()+`<ul class="list"${arch.length?' style="padding-bottom:4px"':''}>${items.join('')}</ul>`;
+    else if(!arch.length&&!S.cwd&&S.nodes.size===0)html=`<div class="empty"><div class="big">🫧</div><p>まだ何もありません</p><p>右下の ＋ からトークをつくって、<br>思いついたことをどんどん投げ込もう。</p><p style="margin-top:22px"><button class="btn" style="padding:0 18px;flex:none" data-act="seed">サンプルで試す</button></p></div>`;
+    else if(!arch.length)html=`<div class="empty"><p>からっぽです</p><p>＋ でトークやフォルダを追加</p></div>`;
+    if(arch.length){
+      html+=`<button class="trashrow" data-act="toggleArch" style="margin-top:6px">🗄 アーカイブ（${arch.length}）${S.showArch?'　▲':'　▼'}</button>`;
+      if(S.showArch)html+=`<ul class="list" style="padding-bottom:4px">${arch.map(n=>itemHTML(n)).join('')}</ul>`;
+    }
     if(!S.cwd&&!S.lsel){const tg=trashGroups().length;if(tg)html+=`<button class="trashrow" data-act="trash">🗑 ごみ箱（${tg}）</button>`}
   }
   $('#listScroll').innerHTML=html;
@@ -638,7 +694,7 @@ function itemHTML(n,o={}){
   const tags=tg.length?`<span class="tgs">${tg.slice(0,2).map(x=>`<span>#${esc(x)}</span>`).join('')}${tg.length>2?`<span>+${tg.length-2}</span>`:''}</span>`:'';
   return `<li class="iw" data-nid="${n.id}"${o.msg?' data-static="1"':''}>
     ${o.msg||sel?'':`<div class="acts"><button data-act="swEdit" data-id="${n.id}"><span class="i">✎</span>編集</button><button data-act="swMore" data-id="${n.id}"><span class="i">⋯</span>その他</button><button class="del" data-act="swDel" data-id="${n.id}"><span class="i">🗑</span>削除</button></div>`}
-    <div class="item${n.id===S.roomId&&!o.msg?' active':''}${sel&&S.lsel.has(n.id)?' sel':''}" data-act="open" data-id="${n.id}"${o.msg?` data-msg="${o.msg.id}"`:''}>
+    <div class="item${n.archived?' arch':''}${n.id===S.roomId&&!o.msg?' active':''}${sel&&S.lsel.has(n.id)?' sel':''}" data-act="open" data-id="${n.id}"${o.msg?` data-msg="${o.msg.id}"`:''}>
       ${sel?'<span class="lck"></span>':''}${avatar(n)}
       <div class="mid"><div class="nmrow"><div class="nm">${esc(n.name)}</div>${tags}</div><div class="pv">${esc(pv)}</div></div>
       <div class="rt"><div class="tm">${t?fmtTime(t):''}</div>${un?`<span class="badge" title="未書き出し">${un>99?'99+':un}</span>`:'<span style="height:20px"></span>'}</div>
@@ -660,12 +716,14 @@ function renderRoom(keepScroll){
       <div class="ttl"><div class="tx"><div class="nm">${S.sel.size}件を選択</div><div class="sb">タップで選択・解除</div></div></div>
       <button class="chip" data-act="selAll" style="margin-right:6px">${allSelected()?'すべて解除':'すべて選択'}</button></div>`;
     const n=S.sel.size;const anyNew=[...S.sel].some(id=>!S.msgs.get(id)?.exportedAt);
+    const dis=n?'':'disabled';
     bottom=`<div class="selbar">
-      <button class="pri" data-act="selExport" ${n?'':'disabled'}><span class="ic">↗</span>書き出す</button>
-      ${n===1?'<button data-act="selEdit"><span class="ic">✎</span>編集</button>':''}<button data-act="selCopy" ${n?'':'disabled'}><span class="ic">⧉</span>コピー</button>
-      <button data-act="selMark" ${n?'':'disabled'}><span class="ic">${anyNew?'✓':'○'}</span>${anyNew?'済みにする':'未に戻す'}</button>
-      <button data-act="selMove" ${n?'':'disabled'}><span class="ic">⇢</span>移動</button>
-      <button data-act="selDelete" ${n?'':'disabled'} style="color:#C9583F"><span class="ic">🗑</span>削除</button></div>`;
+      <button class="pri" data-act="selExport" ${dis}><span class="ic">↗</span>書き出す</button>
+      <button data-act="selClassify" ${dis}><span class="ic">🏷</span>分類</button>
+      <button data-act="selAI" ${dis}><span class="ic">🤖</span>AI</button>
+      <button data-act="selMove" ${dis}><span class="ic">⇢</span>移動</button>
+      <button data-act="selDelete" ${dis} style="color:#C9583F"><span class="ic">🗑</span>削除</button>
+      <button data-act="selMore" ${dis}><span class="ic">⋯</span>その他</button></div>`;
   }else{
     head=`<div class="top">
       <button class="icon only-mobile" data-act="closeRoom">${ICONS.back}</button>
@@ -697,6 +755,13 @@ function autoGrow(ta){ta.style.height='auto';ta.style.height=Math.min(ta.scrollH
 function updSend(){const b=$('#sendBtn');if(b)b.disabled=!($('#ta').value.trim()||S.pending.length)}
 function allSelected(){const ms=roomMsgs(S.roomId);return ms.length&&ms.every(m=>S.sel.has(m.id))}
 
+function msgChips(m){
+  const p=[];if(m.pinned)p.push('<span>📌</span>');if(m.aiMade)p.push('<span title="AIがまとめた資料">🤖</span>');
+  if(m.kind&&KIND[m.kind])p.push(`<span class="kc">${kindText(m.kind)}</span>`);
+  if(m.st&&STL[m.st])p.push(`<span class="sc ${m.st}">${STL[m.st]}</span>`);
+  if((m.tags||[]).length)p.push(`<span class="at">${m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`);
+  return p.join('');
+}
 function linkify(t){let s=esc(t);s=s.replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');return s.replace(HT_RE,m=>`<span class="ht">${m}</span>`)}
 function renderChat(toBottom){
   const c=$('#chat');if(!c)return;const all=roomMsgs(S.roomId);
@@ -708,12 +773,18 @@ function renderChat(toBottom){
   ms.forEach((m,i)=>{
     const d=ymd(m.createdAt);if(d!==lastDay){html+=`<div class="daysep"><span>${dayLabel(m.createdAt)}</span></div>`;lastDay=d}
     const nx=ms[i+1];
-    const showMeta=!nx||ymd(nx.createdAt)!==d||nx.createdAt-m.createdAt>5*60000||!!nx.exportedAt!==!!m.exportedAt;
+    if(m.by==='ai'){
+      html+=`<div class="msg ai${S.sel&&S.sel.has(m.id)?' sel':''}" data-act="tapMsg" data-id="${m.id}" data-lpm="${m.id}">
+        <div class="line"><div class="bub ai">${linkify(m.text||'')}</div><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button></div></div>`;
+      return;
+    }
+    const chips=msgChips(m);
+    const showMeta=!!chips||!nx||nx.by==='ai'||ymd(nx.createdAt)!==d||nx.createdAt-m.createdAt>5*60000||!!nx.exportedAt!==!!m.exportedAt;
     const n=m.images?.length||0;
     const imgs=n?`<div class="imgs ${n===1?'n1':n===2?'n2':n===3?'n3':n===4?'n4':'nmany'}">${m.images.map(b=>`<img data-blob="${b}" data-act="viewImg" alt="">`).join('')}</div>`:'';
     html+=`<div class="msg${S.sel&&S.sel.has(m.id)?' sel':''}" data-act="tapMsg" data-id="${m.id}" data-lpm="${m.id}">
       <div class="line"><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button><div class="bub${m.exportedAt?' done':''}${n&&!m.text?' onlyimg':''}">${imgs}${m.text?linkify(m.text):''}</div></div>
-      ${showMeta?`<div class="meta">${m.exportedAt?'<span class="done">✓ 書き出し済</span>':''}<span>${hm(m.createdAt)}</span></div>`:''}</div>`;
+      ${showMeta?`<div class="meta">${chips}${m.exportedAt?'<span class="done">✓ 書き出し済</span>':''}<span>${hm(m.createdAt)}</span></div>`:''}</div>`;
     if(m.aizuchi)html+=`<div class="reply"><div class="rbub">${esc(m.aizuchi)}</div></div>`;
   });
   if(S.typing===S.roomId)html+=TYPING_HTML;
@@ -878,6 +949,8 @@ function nodeMenu(id){
     n.type==='room'?{toggle:true,icon:'💬',label:'相槌',sub:'メモを送ると、ひとこと返事します',on:!!n.aizuchi,fn:async on=>{n.aizuchi=on;await saveNode(n);if(!on){clearTimeout(aizT);aizT=null;setTyping(null)}toast(on?'相槌をオンにしました':'相槌をオフにしました')}}:null,
     {icon:'✎',label:'名前・アイコン・タグを編集',fn:()=>editNodeSheet(n)},
     {icon:'↗',label:'ここから書き出す',fn:()=>openExport({scope:[n.id]})},
+    {icon:'🤖',label:'AIで整理する',sub:'分類・次の問い・資料化',fn:()=>aiNodeMenu(n)},
+    n.type==='room'&&!n.docs?{icon:'🗄',label:n.archived?'アーカイブから戻す':'アーカイブする',sub:n.archived?'':'一覧の下にしまう。検索には出ます',fn:()=>setArchived([n],!n.archived)}:null,
     {icon:'⇢',label:'移動する',fn:()=>moveSheet(n)},
     n.type==='room'?{icon:n.badge?'○':'●',label:n.badge?'バッジを出さない':'未書き出しバッジを出す',fn:async()=>{n.badge=!n.badge;await saveNode(n);renderList()}}:null,
     {icon:'↺',label:'書き出し済みの印をすべて外す',fn:async()=>{const set=new Set(n.type==='room'?[n.id]:descendants(n.id).filter(d=>d.type==='room').map(d=>d.id));const ch=[...S.msgs.values()].filter(m=>set.has(m.roomId)&&m.exportedAt);ch.forEach(m=>{m.exportedAt=null;m.exportId=null});await saveMsgs(ch);renderList();renderChat();toast(`${ch.length}件の印を外しました`)}},
@@ -925,6 +998,8 @@ function msgMenu(id){
   const m=S.msgs.get(id);if(!m)return;
   menuSheet('',[
     {icon:'☑',label:'選択する',sub:'複数選んで書き出し・移動',fn:()=>selStart(id)},
+    m.by==='ai'?null:{icon:'🏷',label:'分類（種類・状態）',sub:m.kind||m.st?[kindText(m.kind),STL[m.st]].filter(Boolean).join('・'):'未分類',fn:()=>classifySheet([m])},
+    m.by==='ai'?null:{icon:'📌',label:m.pinned?'ピンを外す':'ピン留め',fn:async()=>{m.pinned=!m.pinned;await saveMsg(m);renderChat()}},
     {icon:'⧉',label:'コピー',fn:()=>copyText(m.text||'')},
     {icon:'✎',label:'編集',sub:'本文の一部だけ選んでコピーしたいときもここから',fn:()=>editMsg(m)},
     {icon:'⇢',label:'別のトークへ移動',fn:()=>moveMsgsSheet([m])},
@@ -971,6 +1046,7 @@ function tokenize(s){
   }
   return toks;
 }
+function kindWord(v){if(['未分類','none'].includes(v))return null;for(const k of KINDS)if(k.id===v||k.label.toLowerCase()===v)return k.id;return undefined}
 function parseExpr(src){
   const toks=tokenize(src||'');let p=0;if(!toks.length)return ()=>true;
   const peek=()=>toks[p];
@@ -984,10 +1060,14 @@ function parseExpr(src){
   function atom(t){const v=t.v.toLowerCase();
     if(t.k==='tag')return m=>{for(const x of m._tags)if(x.toLowerCase()===v)return true;return false};
     if(t.k==='sp'){
+      const kw=kindWord(v);if(kw!==undefined)return m=>(m.kind||null)===kw;
+      const sw={'未確定':'draft','draft':'draft','確定':'fixed','fixed':'fixed','完了':'done'}[v];if(sw)return m=>m.st===sw;
+      if(['ピン','pin','📌'].includes(v))return m=>!!m.pinned;
+      if(v==='ai')return m=>m.by==='ai';
       if(['画像','img','image','写真'].includes(v))return m=>(m.images||[]).length>0;
       if(['済','書き出し済','exported','done'].includes(v))return m=>!!m.exportedAt;
       if(['未','未書き出し','new'].includes(v))return m=>!m.exportedAt;
-      throw new Error(`@${t.v} は使えません（@画像 @済 @未）`)}
+      throw new Error(`@${t.v} は使えません（@画像 @済 @未 @タスク @アイデア… @未分類 @確定 @未確定 @完了 @ピン @AI）`)}
     return m=>(m.text||'').toLowerCase().includes(v)}
   const f=orE();if(p<toks.length)throw new Error('カッコの対応がおかしいです');return f;
 }
@@ -996,13 +1076,14 @@ function parseExpr(src){
    EXPORT
    F = 絞り込み条件 / O = 出力形式（前回値を記憶）
    ========================================================= */
-const O_DEF={inc:{date:true,time:true,folder:true,room:true,tags:false,images:true},mode:'group',mark:true,tagMode:'any'};
+const O_DEF={inc:{date:true,time:true,folder:true,room:true,tags:false,images:true,kind:false,id:false,ai:false},mode:'group',mark:true,tagMode:'any'};
 let O=Object.assign(clone(O_DEF),LS.get('out',{}));O.inc=Object.assign({},O_DEF.inc,O.inc||{});
 const newF=scope=>({scope:[...(scope||[])].filter(id=>S.nodes.has(id)),tagIn:[],tagOut:[],status:'new',expr:'',from:'',to:''});
 let F=newF([]),FIX=null,PRESET=null;
 
-function inScope(m){if(!F.scope.length)return true;if(F.scope.includes(m.roomId))return true;return ancestors(m.roomId).some(a=>F.scope.includes(a.id))}
-function scopeMsgs(){const out=[];for(const m of S.msgs.values()){if(!S.nodes.has(m.roomId))continue;if(inScope(m)){m._tags=msgTags(m);out.push(m)}}return out}
+function inScope(m){if(F.scope.includes(m.roomId))return true;if(S.nodes.get(m.roomId)?.archived)return false; // アーカイブは、そのトークを直接選んだときだけ
+  if(!F.scope.length)return true;return ancestors(m.roomId).some(a=>F.scope.includes(a.id))}
+function scopeMsgs(){const out=[];for(const m of S.msgs.values()){if(!S.nodes.has(m.roomId))continue;if(m.by==='ai'&&!O.inc.ai)continue;if(inScope(m)){m._tags=msgTags(m);out.push(m)}}return out}
 function collect(){
   if(FIX)return {list:FIX.map(id=>S.msgs.get(id)).filter(Boolean).sort((a,b)=>a.createdAt-b.createdAt)};
   let ex;try{ex=parseExpr(F.expr)}catch(e){return {err:e.message,list:[]}}
@@ -1023,12 +1104,13 @@ function buildBlocks(list,o=O){
   const blocks=[];let imgNo=0;const inc=o.inc;
   const label=rid=>{const parts=[];if(inc.folder)ancestors(rid).forEach(a=>parts.push(a.name));if(inc.room)parts.push(S.nodes.get(rid)?.name||'');return parts.filter(Boolean).join(' / ')};
   const tagStr=rid=>inc.tags?nodeTagsDeep(rid).map(t=>'#'+t).join(' '):'';
-  const stamp=m=>[inc.date?ymd(m.createdAt):'',inc.time?hm(m.createdAt):''].filter(Boolean).join(' ');
+  const stamp=m=>[inc.date?ymd(m.createdAt):'',inc.time?hm(m.createdAt):'',inc.kind&&m.kind?KIND[m.kind]?.label:'',inc.kind&&m.st?STL[m.st]:'',inc.id?'id:'+sid(m):''].filter(Boolean).join(' ');
+  const body=m=>(m.by==='ai'?'AI: ':'')+(m.text||'');
   const imgs=m=>inc.images?(m.images||[]).map(b=>({blob:b,name:String(++imgNo).padStart(3,'0')})):[];
   if(o.mode==='group'){
     const groups=new Map();list.forEach(m=>{if(!groups.has(m.roomId))groups.set(m.roomId,[]);groups.get(m.roomId).push(m)});
-    for(const [rid,ms] of groups){const h=[label(rid),tagStr(rid)].filter(Boolean).join('  ');if(h)blocks.push({h});ms.forEach(m=>blocks.push({meta:stamp(m),text:m.text||'',imgs:imgs(m)}))}
-  }else list.forEach(m=>{const meta=[stamp(m)?`[${stamp(m)}]`:'',label(m.roomId),tagStr(m.roomId)].filter(Boolean).join(' ');blocks.push({meta,text:m.text||'',imgs:imgs(m),flat:true})});
+    for(const [rid,ms] of groups){const h=[label(rid),tagStr(rid)].filter(Boolean).join('  ');if(h)blocks.push({h});ms.forEach(m=>blocks.push({meta:stamp(m),text:body(m),imgs:imgs(m)}))}
+  }else list.forEach(m=>{const meta=[stamp(m)?`[${stamp(m)}]`:'',label(m.roomId),tagStr(m.roomId)].filter(Boolean).join(' ');blocks.push({meta,text:body(m),imgs:imgs(m),flat:true})});
   return blocks;
 }
 function blocksToText(blocks,imgMode,names){
@@ -1127,7 +1209,7 @@ function openExport({scope,ids}={}){
       <details class="adv" id="exAdv"><summary>詳しい条件<span class="cur" id="exAdvCur"></span></summary><div class="in">
         <input class="expr" id="exExpr" placeholder="例：アプリ (#UI or #設計) -#没 @画像">
         <div class="errtx hidden" id="exErr"></div>
-        <div class="hint">スペース＝かつ／or＝または／-＝除く／( )でまとめる。ことばは本文検索。<br>@画像・@済・@未 も使えます。上のタグ選択と組み合わせて効きます。</div>
+        <div class="hint">スペース＝かつ／or＝または／-＝除く／( )でまとめる。ことばは本文検索。<br>@画像・@済・@未、@タスク・@アイデア・@疑問…・@未分類、@確定・@未確定・@完了、@ピン も使えます。上のタグ選択と組み合わせて効きます。</div>
         <div class="flabel" style="margin-top:12px">期間</div><div class="dates"><input type="date" id="exFrom"><span>〜</span><input type="date" id="exTo"></div>
       </div></details>`}
       <details class="adv" id="exFmt"><summary>出力の形式<span class="cur" id="exFmtCur"></span></summary><div class="in">
@@ -1156,7 +1238,7 @@ function openExport({scope,ids}={}){
     el.innerHTML=tags.length?tags.map(t=>`<span class="chip ${F.tagIn.includes(t)?'in':F.tagOut.includes(t)?'out':''}" data-e="tag" data-v="${esc(t)}">#${esc(t)}</span>`).join(''):'<span class="hint" style="margin:0">この範囲にはタグがありません</span>';
     q('#exTmode').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===O.tagMode))};
   const drawStatus=()=>{const el=q('#exStatus');if(el)el.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===F.status))};
-  const drawInc=()=>{const L={date:'日付',time:'時刻',folder:'フォルダ名',room:'トーク名',tags:'タグ名',images:'画像'};
+  const drawInc=()=>{const L={date:'日付',time:'時刻',folder:'フォルダ名',room:'トーク名',tags:'タグ名',images:'画像',kind:'種類・状態',id:'ID',ai:'AIの問いかけ'};
     q('#exInc').innerHTML=Object.keys(L).map(k=>`<span class="chip ${O.inc[k]?'in':''}" data-e="inc" data-v="${k}">${L[k]}</span>`).join('');
     q('#exMode').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===O.mode));
     q('#exFmtCur').textContent=Object.keys(L).filter(k=>O.inc[k]).map(k=>L[k]).join('・')+'／'+(O.mode==='group'?'トークごと':'時系列')};
@@ -1246,12 +1328,14 @@ function settings(){
       <button data-m="backup"><span class="ic">💾</span><span>まるごとバックアップ（.json）<span class="sub">画像・書き出し履歴・保存した条件も含みます</span></span></button>
       <button data-m="restore"><span class="ic">📥</span><span>バックアップから復元</span></button>
       <button data-m="history"><span class="ic">🕘</span><span>書き出し履歴</span></button>
+      <button data-m="import"><span class="ic">📥</span><span>AIの結果を取り込む<span class="sub">取り込みの履歴・取り消しもここから</span></span></button>
       <button data-m="trash"><span class="ic">🗑</span><span>ごみ箱<span class="sub">消したものは90日間ここから戻せます</span></span></button>
     </div>`);
   sh.querySelector('[data-m=sync]').onclick=()=>{closeSheet();syncSheet()};
   sh.querySelector('[data-m=backup]').onclick=()=>{closeSheet();backup()};
   sh.querySelector('[data-m=restore]').onclick=()=>{closeSheet();$('#fileBackup').click()};
   sh.querySelector('[data-m=history]').onclick=()=>{closeSheet();historySheet()};
+  sh.querySelector('[data-m=import]').onclick=()=>{closeSheet();importSheet()};
   sh.querySelector('[data-m=trash]').onclick=()=>{closeSheet();trashSheet()};
 }
 async function backup(){
@@ -1278,6 +1362,405 @@ async function restore(file){
 }
 
 /* =========================================================
+   分類・一覧・AI（コピペ方式）・取り込み・アーカイブ
+   AIとのやりとりはすべて「プロンプトをコピー → AIと会話 → 確定したJSONを貼る」。
+   取り込みは1回ごとに importId を振り、履歴から取り消せる（作ったものはごみ箱へ）。
+   ========================================================= */
+
+/* ---- 手動の分類 ---- */
+let LVrefresh=null;
+function classifySheet(list,onDone){
+  list=(list||[]).filter(m=>m&&m.by!=='ai');if(!list.length){toast('分類できるメモがありません');return}
+  const common=k=>{const v=list[0][k]??null;return list.every(m=>(m[k]??null)===v)?v:undefined};
+  let kind=common('kind'),st=common('st'),pin=list.every(m=>m.pinned)?true:list.every(m=>!m.pinned)?false:undefined;
+  const touched={};
+  const sh=openSheet(`<h3>${list.length===1?'分類':`${list.length}件を分類`}</h3>
+    <div class="clsgrp"><span class="flabel">種類</span><div class="chips" id="cK"></div></div>
+    <div class="clsgrp"><span class="flabel">状態</span><div class="chips" id="cS"></div></div>
+    <div class="clsgrp"><span class="flabel">ピン</span><div class="chips" id="cP"></div></div>
+    ${list.length>1?'<p class="hint" style="margin:-6px 2px 12px">触った項目だけが変わります。</p>':''}
+    <div class="btns"><button class="btn" data-x="no">やめる</button><button class="btn pri" data-x="ok">保存</button></div>`);
+  const q=x=>sh.querySelector(x);
+  const draw=()=>{
+    q('#cK').innerHTML=[{id:null,ic:'',label:'未分類'},...KINDS].map(k=>`<span class="chip ${kind===k.id?'in':''}" data-k="${k.id??''}">${k.ic}${k.label}</span>`).join('');
+    q('#cS').innerHTML=[{id:null,label:'なし'},...STS].map(x=>`<span class="chip ${st===x.id?'in':''}" data-s="${x.id??''}">${x.label}</span>`).join('');
+    q('#cP').innerHTML=`<span class="chip ${pin===true?'in':''}" data-p="1">📌 ピン留め</span><span class="chip ${pin===false?'in':''}" data-p="0">なし</span>`;
+    sh.querySelectorAll('[data-k]').forEach(c=>c.onclick=()=>{kind=c.dataset.k||null;touched.kind=1;draw()});
+    sh.querySelectorAll('[data-s]').forEach(c=>c.onclick=()=>{st=c.dataset.s||null;touched.st=1;draw()});
+    sh.querySelectorAll('[data-p]').forEach(c=>c.onclick=()=>{pin=c.dataset.p==='1';touched.pin=1;draw()});
+  };
+  draw();
+  q('[data-x=no]').onclick=()=>closeSheet();
+  q('[data-x=ok]').onclick=async()=>{
+    for(const m of list){
+      if(touched.kind)m.kind=kind;if(touched.st)m.st=st;
+      if(touched.kind||touched.st)m.kindBy='me'; // 自分で決めた分類は、AIの取り込みで上書きしない
+      if(touched.pin)m.pinned=pin;
+    }
+    await saveMsgs(list);closeSheet();
+    if(onDone)onDone();else renderChat();
+    LVrefresh&&LVrefresh();
+    if(list.length>1)toast(`${list.length}件を分類しました`);
+  };
+}
+
+/* ---- アーカイブ（トーク単位。削除ではなく「しまう」） ---- */
+async function setArchived(rooms,on){
+  rooms=rooms.filter(r=>r&&r.type==='room'&&!r.docs);if(!rooms.length)return;
+  rooms.forEach(r=>r.archived=!!on);await saveNodes(rooms);renderList();renderRoom(true);LVrefresh&&LVrefresh();
+  if(on)toast(rooms.length===1?`「${rooms[0].name}」をアーカイブしました`:`${rooms.length}件をアーカイブしました`,'元に戻す',()=>setArchived(rooms,false));
+  else toast('アーカイブから戻しました');
+}
+
+/* ---- 一覧（トークをまたいで、メモ単位で絞る） ---- */
+const LV_DEF={q:'',kinds:[],sts:[],pin:false,arch:false,ai:false,tag:''};
+let LV=Object.assign({},LV_DEF,LS.get('lv',{}));
+function lvCollect(){
+  const q=LV.q.trim().toLowerCase(),ks=new Set(LV.kinds),ss=new Set(LV.sts),tag=LV.tag.toLowerCase();const out=[];
+  for(const m of S.msgs.values()){
+    const r=S.nodes.get(m.roomId);if(!r)continue;
+    if(r.archived&&!LV.arch)continue;
+    if(m.by==='ai'&&!LV.ai)continue;
+    if(LV.pin&&!m.pinned)continue;
+    if(ks.size&&!ks.has(m.kind||'none'))continue;
+    if(ss.size&&!ss.has(m.st||'none'))continue;
+    if(q&&!(m.text||'').toLowerCase().includes(q))continue;
+    if(tag&&![...msgTags(m)].some(t=>t.toLowerCase()===tag))continue;
+    out.push(m);
+  }
+  return out.sort((a,b)=>(!!b.pinned-!!a.pinned)||(b.createdAt-a.createdAt));
+}
+function listView(){
+  const sh=openSheet(`<div class="shead"><h3>一覧</h3><button data-l="aimenu">🤖 AI</button></div>
+    <div class="searchbox" style="margin:0 0 10px">${ICONS.search}<input id="lvQ" placeholder="本文で探す"></div>
+    <div class="lvopts"><div class="chips" id="lvK"></div><div class="chips" id="lvS"></div><div class="chips" id="lvT"></div></div>
+    <div class="stat" id="lvStat"></div><div class="lv" id="lvList"></div>`,{full:true});
+  const q=x=>sh.querySelector(x);let cur=[];
+  const save=()=>LS.set('lv',LV);
+  const tgl=(arr,v)=>arr.includes(v)?arr.filter(x=>x!==v):[...arr,v];
+  const drawOpts=()=>{
+    q('#lvK').innerHTML=[...KINDS.map(k=>[k.id,k.ic+k.label]),['none','未分類']].map(([id,l])=>`<span class="chip ${LV.kinds.includes(id)?'in':''}" data-l="k" data-v="${id}">${l}</span>`).join('');
+    q('#lvS').innerHTML=[...STS.map(x=>[x.id,x.label]),['none','状態なし']].map(([id,l])=>`<span class="chip ${LV.sts.includes(id)?'in':''}" data-l="s" data-v="${id}">${l}</span>`).join('')
+      +`<span class="chip ${LV.pin?'in':''}" data-l="pin">📌 ピンのみ</span><span class="chip ${LV.arch?'in':''}" data-l="arch">🗄 アーカイブも</span><span class="chip ${LV.ai?'in':''}" data-l="ai">🤖 AIの問いも</span>`;
+    const tags=allTags().slice(0,24);if(LV.tag&&!tags.includes(LV.tag))tags.unshift(LV.tag);
+    q('#lvT').innerHTML=tags.map(t=>`<span class="chip ${LV.tag===t?'in':''}" data-l="t" data-v="${esc(t)}">#${esc(t)}</span>`).join('');
+    q('#lvT').classList.toggle('hidden',!tags.length);
+  };
+  const drawList=()=>{
+    cur=lvCollect();const shown=cur.slice(0,300);
+    q('#lvStat').innerHTML=`<b>${cur.length}</b>件${cur.length>300?'（新しい300件を表示）':''}`;
+    q('#lvList').innerHTML=shown.length?shown.map(m=>{const r=S.nodes.get(m.roomId);const ai=m.by==='ai';
+      return `<div class="lvc${ai?' ai':''}" data-l="open" data-id="${m.id}"><div class="lvh">${ai?'':`<span class="kc" data-l="cls" data-id="${m.id}">${m.kind?kindText(m.kind):'未分類'}</span>`}${m.st?`<span class="sc ${m.st}">${STL[m.st]}</span>`:''}<span class="rm">${r.archived?'🗄 ':''}${esc(r.name)} · ${fmtTime(m.createdAt)}</span>${ai?'':`<button class="lpin${m.pinned?' on':''}" data-l="pin1" data-id="${m.id}" title="ピン">📌</button>`}</div><div class="lvt">${esc((m.text||'📷 画像').slice(0,300))}</div></div>`}).join('')
+      :'<div class="empty" style="padding:30px">条件に合うメモがありません</div>';
+  };
+  const all=()=>{save();drawOpts();drawList()};
+  LVrefresh=()=>{if(sh.isConnected){drawOpts();drawList()}};
+  const qi=q('#lvQ');qi.value=LV.q;let tm;qi.oninput=()=>{LV.q=qi.value;clearTimeout(tm);tm=setTimeout(()=>{save();drawList()},150)};
+  sh.addEventListener('click',async e=>{
+    const el=e.target.closest('[data-l]');if(!el)return;const v=el.dataset.v;
+    switch(el.dataset.l){
+      case 'k':LV.kinds=tgl(LV.kinds,v);all();break;
+      case 's':LV.sts=tgl(LV.sts,v);all();break;
+      case 'pin':LV.pin=!LV.pin;all();break;
+      case 'arch':LV.arch=!LV.arch;all();break;
+      case 'ai':LV.ai=!LV.ai;all();break;
+      case 't':LV.tag=LV.tag===v?'':v;all();break;
+      case 'pin1':{e.stopPropagation();const m=S.msgs.get(el.dataset.id);if(!m)break;m.pinned=!m.pinned;await saveMsg(m);drawList();if(S.roomId===m.roomId)renderChat();break}
+      case 'cls':{e.stopPropagation();const m=S.msgs.get(el.dataset.id);if(m)classifySheet([m],()=>{if(S.roomId===m.roomId)renderChat()});break}
+      case 'open':{const m=S.msgs.get(el.dataset.id);if(!m)break;closeSheet(sh.parentElement);openRoom(m.roomId,m.id);break}
+      case 'aimenu':{const l=cur.filter(m=>m.by!=='ai');menuSheet(`この一覧（${l.length}件）`,[
+        {icon:'🏷',label:'AIで分類する',sub:'未分類だけ渡すなら、先に「未分類」で絞る',fn:()=>copyPrompt('classify',{msgs:l})},
+        {icon:'🧠',label:'AIでブレストする',sub:'論点ごとにトークを作り、問いを立ててもらう',fn:()=>copyPrompt('brainstorm',{msgs:l})},
+        {icon:'↗',label:'この一覧を書き出す',fn:()=>{if(!l.length)return;closeSheet(sh.parentElement);openExport({ids:l.map(m=>m.id)})}},
+        {icon:'📥',label:'AIの結果を取り込む',fn:()=>importSheet()},
+      ]);break}
+    }
+  });
+  all();
+}
+
+/* ---- AIへ渡すプロンプト ---- */
+function tagListForAI(){
+  const c=new Map();const add=t=>c.set(t,(c.get(t)||0)+1);
+  S.nodes.forEach(n=>(n.tags||[]).forEach(add));
+  S.msgs.forEach(m=>{if(m.by==='ai')return;hashtags(m.text).forEach(add);(m.tags||[]).forEach(add)});
+  let a=[...c].sort((x,y)=>y[1]-x[1]);if(a.length>40)a=a.filter(e=>e[1]>1); // 多いときは1回きりのタグ（表記ゆれの種）を省く
+  return a.slice(0,100).map(([t,n])=>`${t}(${n})`).join(' / ')||'（まだありません）';
+}
+const flat=t=>(t||'（画像のみ）').replace(/\s*\n+\s*/g,' ⏎ ');
+function roomLabelForAI(rid){const r=S.nodes.get(rid);const rt=nodeTagsDeep(rid);return (r?r.name:'')+(rt.length?' '+rt.map(t=>'#'+t).join(' '):'')}
+function roomForAI(r){const ms=roomMsgs(r.id);
+  return `## トーク「${r.name}」 id:${r.id}\n`+(ms.length?ms.map(m=>(m.by==='ai'?'AI（問い）: ':'私: ')+flat(m.text)).join('\n'):'（まだメモなし）')}
+const P_FLOW=`# 進め方
+1. まず案を、人が読みやすい一覧で見せてください。JSONはまだ出さないでください。
+2. 私が修正を伝えたら、反映した一覧を出し直してください。
+3. 私が「確定」と言ったら、件数を1行で書いたあと、下の「出力形式」のJSONを1つだけ、コードブロックで出してください。JSON以外の説明は不要です。`;
+const KIND_DEF=KINDS.map(k=>`- ${k.id}: ${k.label}（${k.desc}）`).join('\n')+'\n- null: どれとも言えない';
+const PROMPTS={
+  classify:({msgs})=>`あなたはメモ整理のアシスタントです。下の【メモ】の1件ずつに「種類」「状態」「タグ」を付けてください。本文は書き換えません。
+
+${P_FLOW}
+（一覧は「ID・種類・状態・タグ・本文の冒頭15字」の形で）
+
+# 種類（kind）— 1件に1つだけ
+${KIND_DEF}
+
+# 状態（st）
+- draft: 未確定（案・検討中）
+- fixed: 確定（決めたこと・方針）
+- done: 完了（終わったこと）
+- null: 状態を持たないもの（出来事・感想など）
+
+# タグ（tags）
+- 0〜3個。内容を表す短い名詞。無理に付けない。
+- まず【既存のタグ】から選ぶ。どれにも当てはまらないときだけ新しく作り、それを newTags にも入れる。
+- 表記は既存タグに合わせる。似た別名（例：UIと画面）を新しく作らない。
+- 各メモの（ ）内にあるトーク名とタグはすでに付いているので、同じタグは付けない。
+
+# 既存のタグ（使われている回数）
+${tagListForAI()}
+
+# 出力形式
+{"nsns":1,"type":"classify","items":[{"id":"a1b2c3","kind":"idea","st":"draft","tags":["UI"]}],"newTags":["新しく作ったタグ"]}
+- id は【メモ】の [ ] の中の6文字をそのまま使う。
+- 全件を入れる。
+
+# メモ（${msgs.length}件）
+${msgs.map(m=>`[${sid(m)}] (${roomLabelForAI(m.roomId)}) ${flat(m.text)}`).join('\n')}
+`,
+  brainstorm:({msgs})=>`あなたは発想を深める壁打ち相手です。下の【メモ】を読んで、考えるべき論点を洗い出し、1論点＝1トークに分けてください。各トークの最初に、私が答えやすい問いを置きます。
+
+${P_FLOW}
+（一覧は、論点のタイトルと最初の問いを番号付きで）
+
+# ルール
+- folder.title は全体のテーマを15字以内で。
+- 論点は3〜8個。title は20字以内。重ならないように分ける。
+- questions は各論点1〜3個。1問ずつ短く具体的に。はい／いいえで終わらない問いにする。
+- メモにない事実を決めつけない。
+
+# 出力形式
+{"nsns":1,"type":"brainstorm","folder":{"title":"…","rooms":[{"key":"r1","title":"…","questions":["…","…"]}]}}
+
+# メモ（${msgs.length}件）
+${msgs.map(m=>`- (${roomLabelForAI(m.roomId)}) ${flat(m.text)}`).join('\n')}
+`,
+  next:({rooms})=>`あなたは発想を深める壁打ち相手です。下の各トークは「AI（問い）」と、それへの「私」のメモでできています。私の答えを踏まえて、次に考えると深まる問いを、トークごとに1〜2個出してください。
+
+${P_FLOW}
+（一覧は、トーク名ごとに次の問いを）
+
+# ルール
+- すでに十分に答えが出ているトークは questions を空にする。
+- 前の問いの言い換えにしない。私の答えの具体的な部分を拾って掘り下げる。
+- 1問ずつ短く。
+
+# 出力形式
+{"nsns":1,"type":"questions","rooms":[{"id":"トークのid","questions":["…"]}]}
+- id は各トークの見出しの「id:」の後ろをそのまま使う。
+
+# トーク（${rooms.length}個）
+${rooms.map(roomForAI).join('\n\n')}
+`,
+  digest:({rooms,folderId})=>`下の【トーク】の内容を、後から読み返せる「資料」1本にまとめてください。
+
+${P_FLOW}
+（一覧の代わりに、まとめの下書きと、アーカイブしてよいトークの名前を見せてください）
+
+# ルール
+- 「結論・決めたこと」「残っている疑問」「次にやること」に分け、箇条書きで書く。
+- メモにない内容は足さない。AIの問いかけそのものは資料に入れない。
+- archive には、結論が十分に出て、もう書き足さなくてよいトークの id だけを入れる。迷うものは入れない。
+- title は20字以内。text の中の改行は \\n で表す。
+
+# 出力形式
+{"nsns":1,"type":"digest","folderId":"${folderId||''}","title":"…","text":"…","archive":["トークのid"]}
+- folderId は上の値をそのまま使う。
+
+# トーク（${rooms.length}個）
+${rooms.map(roomForAI).join('\n\n')}
+`,
+};
+const AI_LABEL={classify:'分類',brainstorm:'ブレスト',next:'次の問い',questions:'次の問い',digest:'資料化'};
+function copyPrompt(type,o){
+  const LIM={classify:300,brainstorm:200};
+  if(o.msgs){o.msgs=o.msgs.filter(m=>m.by!=='ai').sort((a,b)=>a.createdAt-b.createdAt);if(!o.msgs.length){toast('渡すメモがありません');return}
+    if(o.msgs.length>LIM[type]){o.msgs=o.msgs.slice(-LIM[type]);hintOnce('aiLimit',`多いので新しい${LIM[type]}件だけ渡します`)}}
+  if(o.rooms){o.rooms=o.rooms.filter(r=>r&&!r.docs);if(!o.rooms.length){toast('渡すトークがありません');return}}
+  const n=o.msgs?`メモ${o.msgs.length}件`:`トーク${o.rooms.length}個`;
+  copyText(PROMPTS[type](o),true).then(ok=>{if(ok)toast(`${AI_LABEL[type]}のプロンプトをコピーしました（${n}）。AIに貼って、確定したJSONを取り込んでください`,'取り込む',()=>importSheet())});
+}
+function aiNodeMenu(n){
+  const rooms=n.type==='room'?[n]:descendants(n.id).filter(d=>d.type==='room'&&!d.docs&&!d.archived);
+  const msgs=rooms.flatMap(r=>roomMsgs(r.id)).filter(m=>m.by!=='ai');
+  const un=msgs.filter(m=>!m.kind&&m.kindBy!=='me');
+  const fid=n.type==='room'?(n.parentId||''):n.id;
+  menuSheet(`🤖 ${n.name}`,[
+    {icon:'🏷',label:'未分類のメモをAIで分類',sub:`${un.length}件`,fn:()=>copyPrompt('classify',{msgs:un})},
+    {icon:'🏷',label:'すべてのメモをAIで分類し直す',sub:`${msgs.length}件（自分で付けた種類・状態は変わりません）`,fn:()=>copyPrompt('classify',{msgs})},
+    {icon:'🧠',label:'ここからブレストする',sub:'論点ごとにトークを作り、問いを立ててもらう',fn:()=>copyPrompt('brainstorm',{msgs})},
+    {icon:'❓',label:'AIに次の問いを考えてもらう',sub:'書いた答えを踏まえて深掘り',fn:()=>copyPrompt('next',{rooms})},
+    {icon:'📎',label:'AIで資料化する',sub:'まとめを「資料」トークに入れ、終わったトークをアーカイブ',fn:()=>copyPrompt('digest',{rooms,folderId:fid})},
+    {icon:'📥',label:'AIの結果を取り込む',fn:()=>importSheet()},
+  ]);
+}
+
+/* ---- 取り込み ---- */
+function fixJSON(s){ // 文字列の中の生の改行・タブを \n \t に直す（AIがよくやる崩れ）
+  let o='',q=false,e=false;
+  for(const c of s){
+    if(q){if(e){e=false;o+=c;continue}if(c==='\\'){e=true;o+=c;continue}if(c==='"'){q=false;o+=c;continue}
+      if(c==='\n'){o+='\\n';continue}if(c==='\r')continue;if(c==='\t'){o+='\\t';continue}o+=c}
+    else{if(c==='"')q=true;o+=c}
+  }
+  return o;
+}
+function parseAIJSON(txt){
+  txt=String(txt||'').replace(/^\uFEFF/,'');
+  const a=txt.indexOf('{'),b=txt.lastIndexOf('}');if(a<0||b<a)throw new Error('JSONが見つかりません');
+  const raw=txt.slice(a,b+1).replace(/[“”]/g,'"');let j;
+  for(const f of [x=>x,fixJSON,x=>fixJSON(x).replace(/,\s*([}\]])/g,'$1')]){try{j=JSON.parse(f(raw));break}catch(e){}}
+  if(!j)throw new Error('JSONとして読めませんでした（途中で切れていないか確認してください）');
+  if(typeof j!=='object'||!j.type)throw new Error('NSNS用のJSONではありません（type がありません）');
+  return j;
+}
+const normTag=t=>String(t??'').normalize('NFKC').replace(/^#+/,'').replace(/\s+/g,'').trim();
+function tagMapper(){const m=new Map();allTags().forEach(t=>m.set(normTag(t).toLowerCase(),t));return t=>{const n=normTag(t);return n?(m.get(n.toLowerCase())||n):''}}
+const isNull=v=>v==null||v===''||v==='null';
+function planClassify(j){
+  const items=Array.isArray(j.items)?j.items:[];if(!items.length)throw new Error('items が空です');
+  const bySid=new Map(),dup=new Set();
+  for(const m of S.msgs.values()){if(m.by==='ai')continue;const k=sid(m);if(bySid.has(k))dup.add(k);bySid.set(k,m)}
+  const mapT=tagMapper();const known=new Set(allTags().map(t=>t.toLowerCase()));
+  const ch=[],newT=new Set(),seen=new Set();let miss=0,unk=0,mine=0;
+  for(const it of items){
+    const id=String(it.id??'').replace(/[\[\]\s]/g,'').slice(-6);const m=!dup.has(id)&&bySid.get(id);
+    if(!m||seen.has(m.id)){miss++;continue}seen.add(m.id);
+    let kind=isNull(it.kind)?null:String(it.kind).trim();
+    if(kind&&!KIND[kind]){const w=kindWord(kind.toLowerCase());if(w===undefined){unk++;kind=null}else kind=w}
+    let st=isNull(it.st)?null:String(it.st).trim();
+    if(st&&!STL[st])st={'未確定':'draft','確定':'fixed','完了':'done'}[st]||null;
+    const has=new Set([...nodeTagsDeep(m.roomId),...hashtags(m.text)].map(t=>t.toLowerCase()));
+    const tags=[...new Set((Array.isArray(it.tags)?it.tags:[]).map(mapT).filter(Boolean))].filter(t=>!has.has(t.toLowerCase())).slice(0,5);
+    tags.forEach(t=>{if(!known.has(t.toLowerCase()))newT.add(t)});
+    if(m.kindBy==='me')mine++;
+    ch.push({m,kind,st,tags});
+  }
+  return {count:ch.length,
+    html:`メモ <b>${ch.length}</b>件に種類・状態・タグを付けます。${mine?`<br>うち${mine}件は自分で付けた種類・状態を残し、タグだけ足します。`:''}${miss?`<br>見つからないID：${miss}件（スキップ）`:''}${unk?`<br>知らない種類：${unk}件（未分類にします）`:''}${newT.size?`<br>新しいタグ ${newT.size}個：${[...newT].slice(0,15).map(t=>'#'+esc(t)).join(' ')}`:''}`,
+    apply:async iid=>{const prev={},list=[];
+      for(const c of ch){const m=c.m;prev[m.id]=[m.kind??null,m.st??null,m.tags||[],m.kindBy??null];
+        if(m.kindBy!=='me'){m.kind=c.kind;m.st=c.st;m.kindBy='ai'}
+        m.tags=[...new Set([...(m.tags||[]),...c.tags])];m.importId=iid;list.push(m)}
+      await saveMsgs(list);return {prev}}};
+}
+function planBrainstorm(j){
+  const f=j.folder||{};const rooms=(Array.isArray(f.rooms)?f.rooms:[]).filter(r=>r&&String(r.title||r.name||'').trim());
+  if(!rooms.length)throw new Error('トークがありません（folder.rooms が空です）');
+  const qs=r=>(Array.isArray(r.questions)?r.questions:[]).map(x=>String(x).trim()).filter(Boolean);
+  const qn=rooms.reduce((a,r)=>a+qs(r).length,0);
+  const title=String(f.title||'ブレスト').trim().slice(0,40);
+  const pid=S.cwd&&S.nodes.has(S.cwd)?S.cwd:null;const where=pid?S.nodes.get(pid).name:'ホーム';
+  return {count:rooms.length,
+    html:`「${esc(where)}」にフォルダ「<b>${esc(title)}</b>」を作り、トーク <b>${rooms.length}</b>個と問い <b>${qn}</b>件を入れます。<br>${rooms.map(r=>'・'+esc(String(r.title||r.name).slice(0,40))).join('<br>')}`,
+    apply:async iid=>{const t=now();
+      const fo={id:uid(),type:'folder',parentId:pid,name:title,emoji:'🧠',color:PALETTE[3],tags:[],order:nextTopOrder(pid),createdAt:t,importId:iid};
+      const ns=[fo],ms=[];let k=0;
+      rooms.forEach((r,i)=>{const ro={id:uid(),type:'room',parentId:fo.id,name:String(r.title||r.name).trim().slice(0,60),emoji:'',color:PALETTE[i%7],tags:[],badge:true,order:i,createdAt:t,lastAt:t,importId:iid};ns.push(ro);
+        qs(r).forEach(q=>{ms.push({id:uid(),roomId:ro.id,text:q,images:[],createdAt:t+(++k),exportedAt:null,exportId:null,by:'ai',importId:iid});ro.lastAt=t+k})});
+      await saveNodes(ns);await saveMsgs(ms);return {nodes:ns.map(n=>n.id),roots:[fo.id],msgs:ms.map(m=>m.id),open:fo.id}}};
+}
+function planQuestions(j){
+  const ok=[];let miss=0;
+  for(const r of (Array.isArray(j.rooms)?j.rooms:[])){const n=S.nodes.get(String(r?.id??''));
+    const qs=(Array.isArray(r?.questions)?r.questions:[]).map(x=>String(x).trim()).filter(Boolean);
+    if(!n||n.type!=='room'){miss++;continue}if(qs.length)ok.push({n,qs})}
+  const qn=ok.reduce((a,x)=>a+x.qs.length,0);if(!qn)throw new Error(miss?`トークが見つかりません（${miss}件）`:'新しい問いがありません');
+  return {count:qn,
+    html:`トーク <b>${ok.length}</b>個に、次の問い <b>${qn}</b>件を追加します。${miss?`<br>見つからないトーク：${miss}件（スキップ）`:''}<br>${ok.map(x=>`・${esc(x.n.name)}（${x.qs.length}）`).join('<br>')}`,
+    apply:async iid=>{const t=now();let k=0;const ms=[];
+      for(const x of ok){x.qs.forEach(q=>ms.push({id:uid(),roomId:x.n.id,text:q,images:[],createdAt:t+(++k),exportedAt:null,exportId:null,by:'ai',importId:iid}));x.n.lastAt=t+k}
+      await saveMsgs(ms);await saveNodes(ok.map(x=>x.n));return {msgs:ms.map(m=>m.id),open:ok.length===1?ok[0].n.id:null}}};
+}
+function planDigest(j){
+  const text=String(j.text||'').trim();if(!text)throw new Error('まとめの本文（text）がありません');
+  const title=String(j.title||'まとめ').trim().slice(0,60);
+  const fn=j.folderId?S.nodes.get(String(j.folderId)):null;
+  const fid=fn?(fn.type==='folder'?fn.id:(fn.parentId||null)):null;
+  const arch=(Array.isArray(j.archive)?j.archive:[]).map(id=>S.nodes.get(String(id))).filter(n=>n&&n.type==='room'&&!n.docs&&!n.archived);
+  const where=fid?S.nodes.get(fid).name:'ホーム';
+  return {count:1,
+    html:`「${esc(where)}」の「資料」トークに、まとめ「<b>${esc(title)}</b>」を入れます。${arch.length?`<br>アーカイブ候補：${arch.map(n=>esc(n.name)).join('、')}（このあと確認します）`:''}<pre class="preview" style="margin-top:8px;max-height:30dvh">${esc(text.slice(0,2000))}</pre>`,
+    apply:async iid=>{const t=now();const nodes=[];
+      let docs=kids(fid).find(n=>n.type==='room'&&n.docs);
+      if(!docs){docs={id:uid(),type:'room',parentId:fid,name:'資料',emoji:'📌',color:PALETTE[4],tags:[],badge:false,docs:true,order:nextTopOrder(fid),createdAt:t,lastAt:t,importId:iid};nodes.push(docs.id)}
+      const m={id:uid(),roomId:docs.id,text:`【${title}】\n${text}`,images:[],createdAt:t,exportedAt:null,exportId:null,kind:'info',kindBy:'ai',aiMade:true,importId:iid};
+      docs.lastAt=t;await saveNode(docs);await saveMsg(m);
+      let archived=[];
+      if(arch.length&&await confirmSheet(`${arch.length}件のトークをアーカイブしますか？`,arch.map(n=>n.name).join('、')+'　— 一覧の下にしまいます。いつでも戻せます。','アーカイブする')){arch.forEach(n=>n.archived=true);await saveNodes(arch);archived=arch.map(n=>n.id)}
+      return {nodes,roots:nodes,msgs:[m.id],archived,open:docs.id}}};
+}
+function makePlan(j){
+  switch(j.type){
+    case 'classify':return planClassify(j);
+    case 'brainstorm':return planBrainstorm(j);
+    case 'questions':return planQuestions(j);
+    case 'digest':return planDigest(j);
+  }
+  throw new Error(`知らない種類のJSONです（type: ${j.type}）`);
+}
+const importsLog=()=>LS.get('imports',[]);
+const saveImports=a=>LS.set('imports',a.slice(0,15));
+async function undoImport(id){
+  const a=importsLog();const r=a.find(x=>x.id===id);if(!r||r.undone)return;const u=r.undo||{};
+  if(u.prev){const ch=[];for(const [mid,[k,st,tags,kb]] of Object.entries(u.prev)){const m=S.msgs.get(mid);if(!m||m.importId!==r.id)continue;m.kind=k;m.st=st;m.tags=tags;m.kindBy=kb;delete m.importId;ch.push(m)}if(ch.length)await saveMsgs(ch)}
+  if(u.archived&&u.archived.length){const ns=u.archived.map(x=>S.nodes.get(x)).filter(Boolean);ns.forEach(n=>n.archived=false);if(ns.length)await saveNodes(ns)}
+  const all=new Map();(u.nodes||[]).forEach(x=>{const n=S.nodes.get(x);if(n){all.set(x,n);if(n.type==='folder')descendants(x).forEach(d=>all.set(d.id,d))}});
+  const rooms=new Set([...all.values()].filter(n=>n.type==='room').map(n=>n.id));
+  const msgs=new Set((u.msgs||[]).map(x=>S.msgs.get(x)).filter(Boolean));S.msgs.forEach(m=>{if(rooms.has(m.roomId))msgs.add(m)});
+  const trashed=all.size||msgs.size;
+  if(trashed)await moveToTrash([...all.values()],[...msgs],new Set((u.roots||[]).filter(x=>all.has(x))));
+  r.undone=true;saveImports(a);
+  if(S.roomId&&!S.nodes.has(S.roomId)){S.roomId=null;S.sel=null;document.body.classList.remove('in-room')}
+  if(S.cwd&&!S.nodes.has(S.cwd))S.cwd=null;
+  renderList();renderRoom(true);LVrefresh&&LVrefresh();toast('取り込みを取り消しました'+(trashed?'（ごみ箱から戻せます）':''));
+}
+function importSheet(){
+  const sh=openSheet(`<div class="shead"><h3>AIの結果を取り込む</h3><button data-i="paste">クリップボードから</button></div>
+    <div class="imp"><textarea class="inp" id="impTx" placeholder="AIが出したJSONをここに貼り付け（前後に説明文があっても大丈夫）"></textarea></div>
+    <div class="errtx hidden" id="impErr"></div><div id="impSum"></div>
+    <div class="btns"><button class="btn" data-i="no">閉じる</button><button class="btn pri" data-i="ok" disabled>取り込む</button></div>
+    <div id="impLog"></div>`);
+  const q=x=>sh.querySelector(x);let plan=null,j=null;
+  const check=()=>{const v=q('#impTx').value.trim();plan=null;q('[data-i=ok]').disabled=true;q('#impSum').innerHTML='';q('#impErr').classList.add('hidden');if(!v)return;
+    try{j=parseAIJSON(v);plan=makePlan(j);q('#impSum').innerHTML=`<div class="impsum">${plan.html}</div>`;q('[data-i=ok]').disabled=!plan.count}
+    catch(e){q('#impErr').textContent=e.message;q('#impErr').classList.remove('hidden')}};
+  const drawLog=()=>{const a=importsLog();
+    q('#impLog').innerHTML=a.length?`<div class="flabel" style="margin-top:20px">最近の取り込み</div><div class="hist">${a.map(r=>`<div class="h${r.undone?' undone':''}" style="cursor:default"><div class="d"><div class="l">${esc(r.label||r.type)}　${r.count}件</div><div class="s">${mdhm(r.at)}${r.undone?'・取り消し済み':''}</div></div>${r.undone?'':`<button class="chip on" data-u="${r.id}">取り消す</button>`}</div>`).join('')}</div>`:'';
+    q('#impLog').querySelectorAll('[data-u]').forEach(b=>b.onclick=async()=>{
+      if(!await confirmSheet('この取り込みを取り消しますか？','分類は元に戻り、作ったトーク・メモはごみ箱へ移ります（そのトークにあとから書いたメモも一緒に）。','取り消す',true))return;
+      await undoImport(b.dataset.u);drawLog()})};
+  let tm;q('#impTx').addEventListener('input',()=>{clearTimeout(tm);tm=setTimeout(check,250)});
+  q('[data-i=paste]').onclick=async()=>{try{const t=await navigator.clipboard.readText();q('#impTx').value=t;check()}catch(e){toast('読み取れませんでした。欄を長押しして貼り付けてください')}};
+  q('[data-i=no]').onclick=()=>closeSheet(sh.parentElement);
+  q('[data-i=ok]').onclick=async()=>{
+    if(!plan)return;const btn=q('[data-i=ok]');btn.disabled=true;const iid=uid();
+    try{
+      const undo=await plan.apply(iid);
+      const a=importsLog();a.unshift({id:iid,at:now(),type:j.type,label:AI_LABEL[j.type]||j.type,count:plan.count,undo});saveImports(a);
+      closeSheet(sh.parentElement);
+      const o=undo.open&&S.nodes.get(undo.open);
+      if(o&&o.type==='folder'){S.cwd=o.id;if(S.roomId&&!matchMedia('(min-width:900px)').matches)closeRoom();else{renderList();renderRoom(true)}}
+      else if(o)openRoom(o.id);
+      else{renderList();renderRoom(true)}
+      LVrefresh&&LVrefresh();
+      toast(`${AI_LABEL[j.type]||''}を取り込みました（${plan.count}件）`,'元に戻す',()=>undoImport(iid));
+    }catch(e){console.error(e);toast('取り込めませんでした');btn.disabled=false}
+  };
+  drawLog();
+}
+
+/* =========================================================
    NAV & EVENTS
    ========================================================= */
 function openRoom(id,msgId){S.roomId=id;S.pending=[];S.sel=null;S.win=200;S.jump=msgId||null;document.body.classList.add('in-room');renderRoom();renderList();setTimeout(()=>{if(!isTouch()&&!msgId)$('#ta')?.focus()},50)}
@@ -1291,7 +1774,21 @@ const ACT={
   toggleSearch:()=>{S.searchOpen=!S.searchOpen;if(!S.searchOpen)S.search='';renderList();$('#q')?.focus()},
   settings,backup,
   snoozeBackup:()=>{LS.set('backupSnooze',now()+3*86400000);fillListBody()},
-  newMenu:()=>menuSheet('',[{icon:'💬',label:'新しいトーク',fn:()=>newNode('room')},{icon:'📁',label:'新しいフォルダ',fn:()=>newNode('folder')}]),
+  newMenu:()=>menuSheet('',[{icon:'💬',label:'新しいトーク',fn:()=>newNode('room')},{icon:'📁',label:'新しいフォルダ',fn:()=>newNode('folder')},{icon:'📥',label:'AIの結果を取り込む',sub:'整理・ブレスト・資料化のJSONを貼る',fn:()=>importSheet()}]),
+  listView:()=>listView(),
+  toggleArch:()=>{S.showArch=!S.showArch;fillListBody()},
+  selClassify:()=>classifySheet(selList(),()=>selExit()),
+  selAI:()=>{const l=selList().filter(m=>m.by!=='ai');if(!l.length){toast('AIの問いかけ以外を選んでください');return}
+    menuSheet(`${l.length}件のメモをAIへ`,[
+      {icon:'🏷',label:'AIで分類する',sub:'種類・状態・タグを付けてもらう',fn:()=>{copyPrompt('classify',{msgs:l});selExit()}},
+      {icon:'🧠',label:'AIでブレストする',sub:'論点ごとにトークを作り、問いを立ててもらう',fn:()=>{copyPrompt('brainstorm',{msgs:l});selExit()}},
+    ])},
+  selMore:()=>{const l=selList();const anyNew=l.some(m=>!m.exportedAt);menuSheet('',[
+    l.length===1?{icon:'✎',label:'編集',fn:()=>ACT.selEdit()}:null,
+    {icon:'⧉',label:'コピー',fn:()=>ACT.selCopy()},
+    {icon:anyNew?'✓':'○',label:anyNew?'書き出し済みにする':'未書き出しに戻す',fn:()=>ACT.selMark()},
+    {icon:'📌',label:l.every(m=>m.pinned)?'ピンを外す':'ピン留め',fn:async()=>{const on=!l.every(m=>m.pinned);l.forEach(m=>m.pinned=on);await saveMsgs(l);selExit()}},
+  ])},
   nodeMenu:(el,e)=>{e.stopPropagation();nodeMenu(el.dataset.id)},
   exportHere:()=>openExport({scope:S.cwd?[S.cwd]:[]}),
   exportRoom:()=>openExport({scope:[S.roomId]}),
