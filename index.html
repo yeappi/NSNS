@@ -388,6 +388,10 @@ details.adv .in{padding:0 14px 14px}
 .qband .qb-x{padding:5px 8px}
 .bub.ai::before{content:"🤖 "}
 .msg.qtmp .bub.ai{border:1.5px dashed #E9C48A}
+.msg.qold .bub.ai{opacity:.55}
+.msg.qskip{align-items:flex-end;margin:2px 0}
+.msg.qskip .line{justify-content:flex-end}
+.msg.qskip .bub{padding:5px 12px;font-size:13px;opacity:.55}
 .msg.qtmp .bub.ai::before,.bub.ai.q::before{content:"💡 "}
 .qgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .qgrid button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:11px 12px;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgba(60,40,20,.06);text-align:left}
@@ -1837,12 +1841,15 @@ function qDraw(f,subs){
 function qStat(id,i){const s=LS.get('qstats',{});const a=s[id]||[0,0,0];a[i]++;s[id]=a;LS.set('qstats',s)}
 function qShow(rid,f,subs){
   const id=qDraw(f,subs);if(id==null){toast('出せる問いがありません');return}
-  S.qa.set(rid,{f,subs,cur:id,answered:false});qStat(id,0);
+  const prev=S.qa.get(rid);const trail=prev&&prev.f===f&&prev.trail?prev.trail:[];
+  S.qa.set(rid,{f,subs,cur:id,answered:false,trail});qStat(id,0);
   if(S.roomId===rid&&!S.sel)qRefresh();
 }
 function qRefresh(){const w=$('#qwrap');if(w)w.innerHTML=qBandHTML();renderChat(true)}
 function scrollChatEnd(){const c=$('#chat');if(c)c.scrollTop=c.scrollHeight}
-function qNext(){const rid=S.roomId,a=S.qa.get(rid);if(!a)return;if(!a.answered)qStat(a.cur,1);qShow(rid,a.f,a.subs)}
+function qNext(){const rid=S.roomId,a=S.qa.get(rid);if(!a)return;
+  if(!a.answered){qStat(a.cur,1);a.trail.push(a.cur);if(a.trail.length>=3)a.trail=[]}else a.trail=[];
+  qShow(rid,a.f,a.subs)}
 function qEnd(){S.qa.delete(S.roomId);qRefresh()}
 function qAuto(){LS.set('qauto',!LS.get('qauto',false));qRefresh()}
 function qBandHTML(){
@@ -1856,7 +1863,8 @@ function qBandHTML(){
 }
 function qBubbleHTML(){
   const a=S.qa.get(S.roomId);if(!a||a.answered)return '';const q=QBY.get(a.cur);if(!q)return '';
-  return `<div class="msg ai qtmp"><div class="line"><div class="bub ai">${esc(q.t)}</div></div></div>`;
+  const tr=(a.trail||[]).map(id=>`<div class="msg ai qtmp qold"><div class="line"><div class="bub ai">${esc(QBY.get(id)?.t||'')}</div></div></div><div class="msg qskip"><div class="line"><div class="bub">次</div></div></div>`).join('');
+  return tr+`<div class="msg ai qtmp"><div class="line"><div class="bub ai">${esc(q.t)}</div></div></div>`;
 }
 /* 送信時に呼ぶ。true を返したらメモとしては保存しない（「次」） */
 async function qOnSend(text){
@@ -1865,7 +1873,7 @@ async function qOnSend(text){
   if(!a.answered){
     const q=QBY.get(a.cur);
     const qm={id:uid(),roomId:rid,text:q.t,images:[],createdAt:now()-1,exportedAt:null,exportId:null,by:'ai',qid:q.id};
-    await saveMsg(qm);a.answered=true;qStat(q.id,2);
+    await saveMsg(qm);a.answered=true;a.trail=[];qStat(q.id,2);
   }
   return false;
 }
