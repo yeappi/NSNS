@@ -1240,13 +1240,15 @@ function settings(){
   const sh=openSheet(`<h3>NSNS</h3>
     <div class="note" style="margin-bottom:12px">トーク ${rooms}・メモ ${S.msgs.size}・画像 ${[...S.msgs.values()].reduce((a,m)=>a+(m.images||[]).length,0)}<br>
     最後のバックアップ：<b>${last?ago(last):'まだありません'}</b><br>
-    データはこのブラウザの中だけに保存されています。HTMLファイル版とClaude上のプレビュー版は保存場所が別なので、中身は共有されません。</div>
+    ${SYNC.sess?'☁ クラウド同期中です。':'データはこのブラウザの中だけに保存されています。HTMLファイル版とClaude上のプレビュー版は保存場所が別なので、中身は共有されません。'}</div>
     <div class="menu">
+      <button data-m="sync"><span class="ic">☁️</span><span>クラウド同期<span class="sub">${SYNC.sess?'ログイン中':'PCとスマホでメモをそろえる'}</span></span></button>
       <button data-m="backup"><span class="ic">💾</span><span>まるごとバックアップ（.json）<span class="sub">画像・書き出し履歴・保存した条件も含みます</span></span></button>
       <button data-m="restore"><span class="ic">📥</span><span>バックアップから復元</span></button>
       <button data-m="history"><span class="ic">🕘</span><span>書き出し履歴</span></button>
       <button data-m="trash"><span class="ic">🗑</span><span>ごみ箱<span class="sub">消したものは90日間ここから戻せます</span></span></button>
     </div>`);
+  sh.querySelector('[data-m=sync]').onclick=()=>{closeSheet();syncSheet()};
   sh.querySelector('[data-m=backup]').onclick=()=>{closeSheet();backup()};
   sh.querySelector('[data-m=restore]').onclick=()=>{closeSheet();$('#fileBackup').click()};
   sh.querySelector('[data-m=history]').onclick=()=>{closeSheet();historySheet()};
@@ -1481,19 +1483,312 @@ async function seed(){
   await normalizeOrders();renderList();
 }
 
+/* =========================================================
+   CLOUD SYNC（任意）
+   ログインした時だけ動く。ログインしなければ今まで通り、この端末の中だけで完結する。
+   サーバー側：テーブル nsns_records（本人の行だけ読み書き可）＋ 非公開ストレージ nsns（画像）
+   端末側：保存の出入口 DB.put / putMany / del に「あとで送る印（outbox）」を足すだけ。
+   競合は「あとから編集した方が勝つ」。削除は印（tombstone）で他の端末に伝える。
+   ========================================================= */
+const SB_URL='https://dndghstwnnzsetvxjvvn.supabase.co';
+const SB_KEY='sb_publishable_GFAkq09tF0nkgWBlPgm4NA_Gp5YIA4i';
+const SYNCED=['nodes','messages','exports','presets'];
+const RAW={put:DB.put.bind(DB),putMany:DB.putMany.bind(DB),del:DB.del.bind(DB)};
+
+/* outbox は本体DBとは別のIndexedDBに置く（本体DBのバージョンを上げずに済み、開いたままの別タブに邪魔されない） */
+const SQ={
+  db:null,mem:new Map(),
+  async open(){try{this.db=await new Promise((res,rej)=>{const r=indexedDB.open('nsns-sync',1);
+    r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('outbox'))r.result.createObjectStore('outbox',{keyPath:'id'})};
+    r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);r.onblocked=()=>rej(new Error('blocked'))})}catch(e){this.db=null}},
+  req(mode,fn){return new Promise((res,rej)=>{const tx=this.db.transaction('outbox',mode);const r=fn(tx.objectStore('outbox'));tx.oncomplete=()=>res(r&&r.result);tx.onerror=()=>rej(tx.error)})},
+  async all(){return this.db?this.req('readonly',o=>o.getAll()):[...this.mem.values()]},
+  async get(id){return this.db?this.req('readonly',o=>o.get(id)):this.mem.get(id)},
+  async putMany(a){if(!a.length)return;if(!this.db){a.forEach(v=>this.mem.set(v.id,v));return}await this.req('readwrite',o=>{let r;a.forEach(v=>r=o.put(v));return r})},
+  async del(id){if(!this.db){this.mem.delete(id);return}await this.req('readwrite',o=>o.delete(id))},
+  async clear(){if(!this.db){this.mem.clear();return}await this.req('readwrite',o=>o.clear())},
+};
+
+const SYNC={
+  enabled:!!LS.get('sync:enabled',false),sess:LS.get('sync:sess',null),
+  running:false,again:false,err:'',dropped:0,last:LS.get('sync:last',0),flushT:null,tokenP:null,missing:new Map(),
+  BLOB_BATCH:25,
+
+  /* ---- 保存の出入口から呼ばれる：送る印を残す ---- */
+  note(store,ids,op){
+    if(!this.enabled)return;
+    const t=now();let ents;
+    if(store==='blobs')ents=ids.map(id=>({id:'blobs/'+id,store,rid:id,op:op==='put'?'blobup':'blobdel',t}));
+    else if(SYNCED.includes(store))ents=ids.map(id=>({id:store+'/'+id,store,rid:id,op,t}));
+    else return;
+    SQ.putMany(ents).then(()=>{if(this.sess)this.kick()}).catch(()=>{});
+  },
+  kick(){clearTimeout(this.flushT);this.flushT=setTimeout(()=>this.run(),1500)},
+
+  /* ---- 認証（メール＋パスワード。リンク式はiPhoneのホーム画面版だとSafariで開いてしまうので使わない） ---- */
+  async auth(path,body){
+    const r=await fetch(SB_URL+'/auth/v1/'+path,{method:'POST',headers:{apikey:SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok){const e=new Error(j.msg||j.error_description||j.message||('HTTP '+r.status));e.status=r.status;e.code=j.error_code||j.error||'';throw e}
+    return j;
+  },
+  setSess(j){this.sess={access_token:j.access_token,refresh_token:j.refresh_token,expires_at:now()+(j.expires_in||3600)*1000,uid:j.user.id,email:j.user.email};LS.set('sync:sess',this.sess)},
+  async token(force){
+    const s=this.sess;if(!s)throw new Error('no session');
+    if(!force&&s.expires_at-now()>60000)return s.access_token;
+    if(!this.tokenP)this.tokenP=this.auth('token?grant_type=refresh_token',{refresh_token:s.refresh_token})
+      .then(j=>this.setSess(j))
+      .catch(e=>{if(e.status===400||e.status===401){this.sess=null;LS.set('sync:sess',null)}throw e})
+      .finally(()=>{this.tokenP=null});
+    await this.tokenP;return this.sess.access_token;
+  },
+  async api(path,opt={},retry=true){
+    const tok=await this.token();
+    const r=await fetch(SB_URL+path,{...opt,headers:{apikey:SB_KEY,Authorization:'Bearer '+tok,...(opt.headers||{})}});
+    if(r.status===401&&retry){await this.token(true);return this.api(path,opt,false)}
+    return r;
+  },
+  async login(email,pw,signup){
+    let j;
+    if(signup){j=await this.auth('signup',{email,password:pw});if(!j.access_token)return 'confirm'}
+    else j=await this.auth('token?grant_type=password',{email,password:pw});
+    const prev=LS.get('sync:uid',null);
+    if(prev&&prev!==j.user.id){await SQ.clear();LS.set('sync:cursor','');LS.set('sync:init:'+j.user.id,0)} // 別アカウントに切り替えたら、古い送り待ちは捨てる
+    this.setSess(j);this.enabled=true;LS.set('sync:enabled',true);LS.set('sync:uid',j.user.id);this.err='';
+    this.run();return 'ok';
+  },
+  async logout(){
+    const tok=this.sess&&this.sess.access_token;
+    this.sess=null;LS.set('sync:sess',null);
+    try{if(tok)await fetch(SB_URL+'/auth/v1/logout',{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+tok}})}catch(e){}
+  },
+
+  /* ---- 初回／やり直し：いまある全部を送り待ちに積む ---- */
+  async blobKeys(){return new Set(DB.db?await DB.req('blobs','readonly',o=>o.getAllKeys()):[...DB.mem.blobs.keys()])},
+  async enqueueAll(){
+    const t=now();
+    for(const s of SYNCED){
+      const arr=await DB.all(s);const fix=[];
+      for(const v of arr)if(!v._u){v._u=v.lastAt||v.createdAt||v.at||1;fix.push(v)}
+      if(fix.length)await RAW.putMany(s,fix);
+      await SQ.putMany(arr.map(v=>({id:s+'/'+v.id,store:s,rid:v.id,op:'put',t:v._u})));
+    }
+    const keys=await this.blobKeys();
+    await SQ.putMany([...keys].map(id=>({id:'blobs/'+id,store:'blobs',rid:id,op:'blobup',t})));
+  },
+
+  /* ---- 送る ---- */
+  async postRows(rows){
+    const r=await this.api('/rest/v1/nsns_records?on_conflict=user_id,store,id',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(rows)});
+    if(r.ok)return true;
+    if(r.status>=500||r.status===429||r.status===408)throw new Error('server '+r.status);
+    return false; // 4xx：この内容は受け付けてもらえない
+  },
+  async flushRecords(ents){
+    const uid=this.sess.uid;const recs=ents.filter(e=>e.op==='put'||e.op==='del');
+    for(let i=0;i<recs.length;i+=100){
+      const chunk=recs.slice(i,i+100);const rows=[];
+      for(const e of chunk){
+        const tomb={user_id:uid,store:e.store,id:e.rid,data:null,deleted:true,client_updated_at:e.t};
+        if(e.op==='del'){rows.push(tomb);continue}
+        const rec=await DB.get(e.store,e.rid);
+        if(!rec){rows.push(tomb);continue}
+        const {_tags,...data}=rec;
+        rows.push({user_id:uid,store:e.store,id:e.rid,data,deleted:false,client_updated_at:rec._u||e.t});
+      }
+      if(!await this.postRows(rows)){
+        if(rows.length>1){for(const row of rows)if(!await this.postRows([row]))this.dropped++} // 1件ずつ試し、ダメな1件だけ諦める
+        else this.dropped++;
+      }
+      for(const e of chunk){const cur=await SQ.get(e.id);if(cur&&cur.t===e.t)await SQ.del(e.id)}
+    }
+  },
+  async flushBlobs(ents){
+    const uid=this.sess.uid;const bl=ents.filter(e=>e.op==='blobup'||e.op==='blobdel');
+    for(const e of bl.slice(0,this.BLOB_BATCH)){
+      const path=`/storage/v1/object/nsns/${uid}/${e.rid}`;
+      if(e.op==='blobup'){
+        const rec=await DB.get('blobs',e.rid);
+        if(rec){const r=await this.api(path,{method:'POST',headers:{'x-upsert':'true','Content-Type':rec.blob.type||'application/octet-stream'},body:rec.blob});
+          if(!r.ok&&(r.status>=500||r.status===429))throw new Error('storage '+r.status)}
+      }else{
+        const r=await this.api(path,{method:'DELETE'});if(!r.ok&&r.status>=500)throw new Error('storage '+r.status);
+      }
+      const cur=await SQ.get(e.id);if(cur&&cur.t===e.t)await SQ.del(e.id);
+    }
+    return Math.max(0,bl.length-this.BLOB_BATCH);
+  },
+
+  /* ---- 取り込む ---- */
+  mem(s,id,rec){ // 画面が持っているメモリ上の状態も合わせる
+    if(s==='nodes'){S.nodes.delete(id);S.tnodes.delete(id);if(rec)(rec.deletedAt?S.tnodes:S.nodes).set(id,rec)}
+    else if(s==='messages'){S.msgs.delete(id);S.tmsgs.delete(id);if(rec)(rec.deletedAt?S.tmsgs:S.msgs).set(id,rec)}
+    else if(s==='exports'){S.exports.delete(id);if(rec)S.exports.set(id,rec)}
+    else if(s==='presets'){S.presets.delete(id);if(rec)S.presets.set(id,rec)}
+  },
+  async apply(rows){
+    let ch=false;
+    for(const r of rows){
+      if(!SYNCED.includes(r.store))continue;
+      const local=await DB.get(r.store,r.id);
+      const pend=await SQ.get(r.store+'/'+r.id);
+      const mine=Math.max(local?(local._u||0):0,pend&&pend.op==='del'?pend.t:0);
+      const ru=Number(r.client_updated_at);
+      if(ru<=mine)continue; // こちらの方が新しい（同じ）なら何もしない
+      if(r.deleted){
+        if(local){await RAW.del(r.store,r.id);this.mem(r.store,r.id,null);ch=true}
+      }else{
+        const rec={...r.data,_u:ru};
+        await RAW.put(r.store,rec);this.mem(r.store,r.id,rec);ch=true;
+      }
+      if(pend)await SQ.del(pend.id);
+    }
+    return ch;
+  },
+  async pull(){
+    const cur=LS.get('sync:cursor','');
+    let since=cur?new Date(new Date(cur).getTime()-120000).toISOString():'1970-01-01T00:00:00Z'; // 2分さかのぼる（取りこぼし防止）
+    let changed=false,newest=cur;
+    for(;;){
+      const r=await this.api('/rest/v1/nsns_records?select=store,id,data,deleted,client_updated_at,updated_at&order=updated_at.asc&limit=500&updated_at=gt.'+encodeURIComponent(since));
+      if(!r.ok)throw new Error('pull '+r.status);
+      const rows=await r.json();
+      if(!rows.length)break;
+      if(await this.apply(rows))changed=true;
+      since=rows[rows.length-1].updated_at;
+      if(!newest||new Date(since)>new Date(newest))newest=since;
+      if(rows.length<500)break;
+    }
+    if(newest)LS.set('sync:cursor',newest);
+    return changed;
+  },
+  async fetchBlobs(){
+    const need=new Set();
+    for(const m of [...S.msgs.values(),...S.tmsgs.values()])for(const i of m.images||[])need.add(i);
+    for(const n of [...S.nodes.values(),...S.tnodes.values()])if(n.photo)need.add(n.photo);
+    const have=await this.blobKeys();
+    const list=[...need].filter(id=>!have.has(id)&&!((this.missing.get(id)||0)>now()));
+    if(!list.length)return {got:0,rest:0};
+    const uid=this.sess.uid;let got=0;const part=list.slice(0,this.BLOB_BATCH);
+    for(let i=0;i<part.length;i+=3){
+      await Promise.all(part.slice(i,i+3).map(async id=>{
+        try{
+          const r=await this.api(`/storage/v1/object/authenticated/nsns/${uid}/${id}`);
+          if(r.ok){const blob=await r.blob();await RAW.put('blobs',{id,blob});got++}
+          else this.missing.set(id,now()+120000); // まだ上がっていない画像は2分あとにもう一度
+        }catch(e){this.missing.set(id,now()+120000)}
+      }));
+    }
+    if(got)await loadPhotos();
+    return {got,rest:list.length-part.length};
+  },
+
+  /* ---- 画面に反映（入力中の文字やスクロール位置は壊さない） ---- */
+  refresh(){
+    bump();
+    const typing=document.activeElement&&document.activeElement.id==='ta';
+    if(document.activeElement&&document.activeElement.id==='q')fillListBody();else renderList();
+    if(!S.roomId)return;
+    if(!S.nodes.has(S.roomId)){if(!typing)renderRoom();return}
+    if(typing||S.sel){const c=$('#chat');const st=c&&c.scrollTop;renderChat(false);if(c)c.scrollTop=st}
+    else renderRoom(true);
+  },
+
+  /* ---- 1回分の同期 ---- */
+  async run(){
+    if(!this.sess)return;
+    if(this.running){this.again=true;return}
+    this.running=true;this.err='';let more=false;
+    try{
+      const uid=this.sess.uid;
+      if(!LS.get('sync:init:'+uid,0)){await this.enqueueAll();LS.set('sync:init:'+uid,1)}
+      await this.flushRecords(await SQ.all());
+      const ch=await this.pull();
+      await this.flushRecords(await SQ.all());
+      const left=await this.flushBlobs(await SQ.all());
+      const f=await this.fetchBlobs();
+      more=left>0||f.rest>0;
+      if(ch||f.got)this.refresh();
+      this.last=now();LS.set('sync:last',this.last);
+    }catch(e){
+      this.err=!this.sess?'ログインが切れました。設定の「クラウド同期」から入り直してください'
+        :(navigator.onLine===false?'オフラインです（つながったら自動で同期します）':'同期できませんでした（あとで自動で再試行します）');
+    }finally{
+      this.running=false;
+      if(this.again||more){this.again=false;setTimeout(()=>this.run(),more?1000:300)}
+    }
+  },
+  start(){
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)this.run()});
+    window.addEventListener('online',()=>this.run());
+    setInterval(()=>{if(!document.hidden)this.run()},45000);
+    this.run();
+  },
+};
+/* 保存の出入口に「送る印」を足す。ログインしていなければ何も起きない（enabled が false のまま） */
+DB.put=async function(s,v){if(SYNC.enabled&&SYNCED.includes(s))v._u=now();await RAW.put(s,v);SYNC.note(s,[v.id],'put')};
+DB.putMany=async function(s,a){if(SYNC.enabled&&SYNCED.includes(s)){const t=now();a.forEach(v=>v._u=t)}await RAW.putMany(s,a);if(a.length)SYNC.note(s,a.map(v=>v.id),'put')};
+DB.del=async function(s,id){await RAW.del(s,id);SYNC.note(s,[id],'del')};
+
+async function syncSheet(){
+  const when=t=>t?`${mdhm(t)}`:'まだありません';
+  if(!SYNC.sess){
+    const sh=openSheet(`<h3>クラウド同期</h3>
+      <div class="note" style="margin-bottom:14px">ログインすると、PCとスマホでメモがそろいます。ログインしなければ、今までどおりこの端末の中だけで使えます。<br>ログインしても、この端末のデータは消えません。</div>
+      <div class="field"><label>メールアドレス</label><input class="inp" id="sbMail" type="email" autocomplete="email" inputmode="email" value="${esc(LS.get('sync:mail',''))}"></div>
+      <div class="field"><label>パスワード（8文字以上）</label><input class="inp" id="sbPw" type="password" autocomplete="current-password"></div>
+      <div id="sbMsg" class="note" style="display:none;margin-bottom:10px"></div>
+      <div class="btns"><button class="btn" data-x="up">新規登録</button><button class="btn pri" data-x="in">ログイン</button></div>`);
+    const msg=t=>{const m=sh.querySelector('#sbMsg');m.textContent=t;m.style.display=t?'block':'none'};
+    const go=async signup=>{
+      const email=sh.querySelector('#sbMail').value.trim(),pw=sh.querySelector('#sbPw').value;
+      if(!email||pw.length<8){msg('メールアドレスと、8文字以上のパスワードを入れてください');return}
+      LS.set('sync:mail',email);sh.querySelectorAll('button').forEach(b=>b.disabled=true);msg(signup?'登録しています…':'ログインしています…');
+      try{
+        const r=await SYNC.login(email,pw,signup);
+        if(r==='confirm'){msg('確認メールを送りました。メールの確認が終わったら、ここからログインしてください。');sh.querySelectorAll('button').forEach(b=>b.disabled=false);return}
+        closeSheet();toast('同期をはじめました');
+      }catch(e){
+        const c=e.code||'';
+        msg(c==='invalid_credentials'?'メールかパスワードが違います':c==='email_not_confirmed'?'メールの確認がまだです。届いたメールを確認してください':c==='user_already_exists'?'このメールは登録済みです。「ログイン」を押してください':/Failed to fetch|NetworkError|Load failed/i.test(e.message)?'つながりませんでした。ネットワークを確認してください':e.message);
+        sh.querySelectorAll('button').forEach(b=>b.disabled=false);
+      }
+    };
+    sh.querySelector('[data-x=in]').onclick=()=>go(false);sh.querySelector('[data-x=up]').onclick=()=>go(true);
+    sh.querySelector('#sbPw').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229)go(false)});
+    return;
+  }
+  const waiting=(await SQ.all()).length;
+  const sh=openSheet(`<h3>クラウド同期</h3>
+    <div class="note" style="margin-bottom:12px">ログイン中：<b>${esc(SYNC.sess.email||'')}</b><br>
+    最後の同期：<b>${when(SYNC.last)}</b>${SYNC.running?'（いま同期中…）':''}<br>
+    送り待ち：${waiting}件${SYNC.err?`<br><span style="color:#C9583F">${esc(SYNC.err)}</span>`:''}${SYNC.dropped?`<br>受け付けられなかった項目：${SYNC.dropped}件`:''}</div>
+    <div class="menu">
+      <button data-m="now"><span class="ic">🔄</span><span>今すぐ同期</span></button>
+      <button data-m="all"><span class="ic">☁️</span><span>この端末の全部をもう一度アップロード<span class="sub">うまくそろわないときに</span></span></button>
+      <button data-m="out"><span class="ic">🚪</span><span>ログアウト<span class="sub">この端末のデータは消えません</span></span></button>
+    </div>`);
+  sh.querySelector('[data-m=now]').onclick=()=>{closeSheet();SYNC.run();toast('同期しています…')};
+  sh.querySelector('[data-m=all]').onclick=async()=>{closeSheet();await SYNC.enqueueAll();SYNC.run();toast('アップロードしています…')};
+  sh.querySelector('[data-m=out]').onclick=async()=>{closeSheet();await SYNC.logout();toast('ログアウトしました')};
+}
+
 (async()=>{
   await DB.open();
+  await SQ.open();
   const [n,m,x,p]=await Promise.all(['nodes','messages','exports','presets'].map(s=>DB.all(s)));
   n.forEach(v=>(v.deletedAt?S.tnodes:S.nodes).set(v.id,v));m.forEach(v=>(v.deletedAt?S.tmsgs:S.msgs).set(v.id,v));x.forEach(v=>S.exports.set(v.id,v));p.forEach(v=>S.presets.set(v.id,v));bump();
   await purgeTrash(x=>x.deletedAt<now()-90*86400000);
   await normalizeOrders();
   await loadPhotos();
   renderList();renderRoom();
+  SYNC.start();
   if (!document.activeElement || !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) window.scrollTo(0,0);
 })();
 </script>
 <script>
-if ('serviceWorker' in navigator) {
+/* Claude上のプレビュー（claudeusercontent.com）やfile://には sw.js が無いので、登録しない */
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !/claudeusercontent\.com$/.test(location.hostname)) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', {scope: '/'}).catch(err => console.warn('NSNS PWA:', err));
   });
