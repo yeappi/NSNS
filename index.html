@@ -375,6 +375,33 @@ details.adv .in{padding:0 14px 14px}
 .imp textarea{min-height:150px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
 .impsum{font-size:13.5px;line-height:1.7;background:var(--card);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow);margin:10px 0}
 .impsum b{color:var(--accent-ink)}
+
+/* 問いかけ */
+#qwrap{flex:none}
+.qbtn{font-size:19px}
+.qband{flex:none;display:flex;align-items:center;gap:6px;margin:6px 10px 0;padding:5px 6px 5px 12px;border-radius:12px;background:#FFF4E2;font-size:12.5px;color:#7A5A2E}
+.qband .qb-t{flex:1;font-weight:700;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qband .qb-t small{font-weight:400;margin-left:6px;opacity:.8}
+.qband button{padding:5px 10px;border-radius:10px;font-size:12px;color:#7A5A2E;background:rgba(255,255,255,.7)}
+.qband .qb-auto.on{background:#E9A23B;color:#fff}
+.qband .qb-next{font-weight:700}
+.qband .qb-x{padding:5px 8px}
+.bub.ai::before{content:"🤖 "}
+.msg.qtmp .bub.ai{border:1.5px dashed #E9C48A}
+.msg.qold .bub.ai{opacity:.55}
+.msg.qskip{align-items:flex-end;margin:2px 0}
+.msg.qskip .line{justify-content:flex-end}
+.msg.qskip .bub{padding:5px 12px;font-size:13px;opacity:.55}
+.msg.qtmp .bub.ai::before,.bub.ai.q::before{content:"💡 "}
+.qgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.qgrid button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:11px 12px;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgba(60,40,20,.06);text-align:left}
+.qgrid button:hover{background:#FFF8EE}
+.qgrid .qi{font-size:20px}
+.qgrid b{font-size:14px}
+.qgrid small{font-size:11.5px;color:var(--sub)}
+.qsubs{margin-top:12px}
+.qsl{font-size:12px;color:var(--sub);margin:0 2px 6px}
+.qsc{display:flex;flex-wrap:wrap;gap:6px}
 </style>
 </head>
 <body>
@@ -735,11 +762,12 @@ function renderRoom(keepScroll){
       <div class="pending ${S.pending.length?'':'hidden'}" id="pending"></div>
       <div class="crow">
         <button class="icon" data-act="pickImg" title="画像">${ICONS.img}</button>
+        <button class="icon qbtn" data-act="qSheet" title="問いかけ">💡</button>
         <textarea id="ta" rows="1" placeholder="メモを書く"></textarea>
         <button class="send" id="sendBtn" data-act="send" disabled title="送信">${ICONS.send}</button>
       </div></div>`;
   }
-  P.innerHTML=head+`<div class="chat${S.sel?' selmode':''}" id="chat"></div>`+bottom;
+  P.innerHTML=head+(S.sel?'':`<div id="qwrap">${qBandHTML()}</div>`)+`<div class="chat${S.sel?' selmode':''}" id="chat"></div>`+bottom;
   renderChat(!keepScroll);if(keepScroll&&st!=null)$('#chat').scrollTop=st;
   if(!S.sel){
     renderPending();
@@ -765,6 +793,7 @@ function msgChips(m){
 function linkify(t){let s=esc(t);s=s.replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');return s.replace(HT_RE,m=>`<span class="ht">${m}</span>`)}
 function renderChat(toBottom){
   const c=$('#chat');if(!c)return;const all=roomMsgs(S.roomId);
+  if(!all.length&&S.qa.get(S.roomId)){c.innerHTML=qBubbleHTML();return}
   if(!all.length){c.innerHTML=`<div class="roomempty"><div>思いついたことを、ぽんぽん投げ込もう<br><span style="font-size:11.5px">本文に #タグ を書くと、そのメモにもタグがつきます<br>メモを長押し（右クリック）で選択・書き出し</span></div></div>`;return}
   if(S.jump){const i=all.findIndex(m=>m.id===S.jump);if(i>=0)S.win=Math.max(S.win,all.length-i+10)}
   const start=Math.max(0,all.length-S.win);const ms=all.slice(start);
@@ -775,7 +804,7 @@ function renderChat(toBottom){
     const nx=ms[i+1];
     if(m.by==='ai'){
       html+=`<div class="msg ai${S.sel&&S.sel.has(m.id)?' sel':''}" data-act="tapMsg" data-id="${m.id}" data-lpm="${m.id}">
-        <div class="line"><div class="bub ai">${linkify(m.text||'')}</div><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button></div></div>`;
+        <div class="line"><div class="bub ai${m.qid?' q':''}">${linkify(m.text||'')}</div><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button></div></div>`;
       return;
     }
     const chips=msgChips(m);
@@ -787,6 +816,7 @@ function renderChat(toBottom){
       ${showMeta?`<div class="meta">${chips}${m.exportedAt?'<span class="done">✓ 書き出し済</span>':''}<span>${hm(m.createdAt)}</span></div>`:''}</div>`;
     if(m.aizuchi)html+=`<div class="reply"><div class="rbub">${esc(m.aizuchi)}</div></div>`;
   });
+  html+=qBubbleHTML();
   if(S.typing===S.roomId)html+=TYPING_HTML;
   c.innerHTML=html;hydrate(c);
   if(S.jump){const el=c.querySelector(`[data-id="${S.jump}"].msg`);S.jump=null;if(el){el.scrollIntoView({block:'center'});el.classList.add('flash');return}}
@@ -820,11 +850,13 @@ function scheduleAizuchi(rid,mid){
 }
 async function sendMsg(){
   const ta=$('#ta');if(!ta)return;const text=ta.value.replace(/\s+$/,'');if(!text.trim()&&!S.pending.length)return;
+  if(await qOnSend(text)){ta.value='';LS.set('draft:'+S.roomId,'');autoGrow(ta);updSend();return}
   const ids=[];for(const p of S.pending){const id=uid();await DB.put('blobs',{id,blob:p.blob});S.urls.set(id,p.url);ids.push(id)}
   const m={id:uid(),roomId:S.roomId,text:text.trim()?text:'',images:ids,createdAt:now(),exportedAt:null,exportId:null};
   await saveMsg(m);const r=S.nodes.get(S.roomId);r.lastAt=m.createdAt;await saveNode(r);
   S.pending=[];ta.value='';LS.set('draft:'+r.id,'');autoGrow(ta);renderPending();renderChat(true);renderList();if(!isTouch())ta.focus();
   if(r.aizuchi)scheduleAizuchi(r.id,m.id);
+  qAfterSend();
   if(roomMsgs(r.id).length===1)hintOnce('msgLP','メモは長押しで選択して、まとめて書き出せます');
 }
 
@@ -1331,6 +1363,7 @@ function settings(){
       <button data-m="import"><span class="ic">📥</span><span>AIの結果を取り込む<span class="sub">取り込みの履歴・取り消しもここから</span></span></button>
       <button data-m="trash"><span class="ic">🗑</span><span>ごみ箱<span class="sub">消したものは90日間ここから戻せます</span></span></button>
     </div>`);
+  {let n=0,t=0;sh.querySelector('h3').onclick=()=>{const x=now();n=x-t<1500?n+1:1;t=x;if(n>=5){n=0;qStatsCopy()}}}
   sh.querySelector('[data-m=sync]').onclick=()=>{closeSheet();syncSheet()};
   sh.querySelector('[data-m=backup]').onclick=()=>{closeSheet();backup()};
   sh.querySelector('[data-m=restore]').onclick=()=>{closeSheet();$('#fileBackup').click()};
@@ -1761,6 +1794,111 @@ function importSheet(){
 }
 
 /* =========================================================
+   問いかけ（💡）：はたらき8種＋吐き出しの分野。AIなしで回す。
+   ・山（シャッフル）は1周するまで同じ問いを出さない
+   ・問いは答えたときだけトークに残す（by:'ai'・qid）。飛ばした問いは残さない
+   ・統計（表示/次/答えた）は端末内のみ。設定の「NSNS」を5回タップでコピー
+   ========================================================= */
+const QF=[
+  {k:'dump',ic:'🫧',t:'吐き出す',d:'頭にあることを出したい'},
+  {k:'widen',ic:'🌱',t:'広げる',d:'アイデアを増やしたい'},
+  {k:'deepen',ic:'⛏',t:'深める',d:'1つを掘りたい'},
+  {k:'organize',ic:'🧩',t:'整える',d:'ごちゃごちゃを整理したい'},
+  {k:'review',ic:'🔍',t:'見直す',d:'穴を探したい'},
+  {k:'decide',ic:'🎯',t:'決める',d:'絞りたい'},
+  {k:'act',ic:'🏃',t:'動く',d:'次の一歩にしたい'},
+  {k:'reflect',ic:'🔁',t:'振り返る',d:'ここまでを見返したい'}];
+const QFK=Object.fromEntries(QF.map(f=>[f.k,f]));
+const QSUB=[['gen','汎用'],['todo','やること'],['feel','気持ち'],['wish','望み'],['notice','気づき'],['work','仕事']];
+const QSUBL=Object.fromEntries(QSUB);
+/* 番号は固定。言い回しを直しても番号は変えない。削ったら欠番、足すなら#196から */
+const QSRC=[
+ ['dump','gen',1,['今、頭を占めてることは？','今日、いちばん印象に残ったことは？','最近、よく考えてることは？','最近、時間を取られてることは？','今、ちょっとだけ気になることは？','最近、誰かに話したことは？','昨日と今日で、違ったことは？','今の自分に足りないと感じるものは？','お金のことで気になってることは？','体のことで、ちょっと気になることは？','部屋や持ち物で、直したいところは？','ふと思い出した人はいる？','誰かに相談したいことは？','今日、いちばん時間を使ったことは？','最近、人と会って思ったことは？']],
+ ['dump','todo',16,['気になってるのに放置してることは？','返事してない連絡はある？','今週中に終わらせたいことは？','やらなきゃと思って、まだやってないことは？','期限が近いものは？','頼まれたまま、止まってることは？','片づけたいものは？','予約や申し込みで、忘れてそうなものは？','支払いや手続きで、気になってることは？','明日までに済ませたいことは？','後回しにしてることは？','持っていくもの、用意するものは？','誰かに返さなきゃいけないものは？','直したいもの、修理したいものは？','もうやめたいのに、続けてることは？']],
+ ['dump','feel',31,['最近イラッとしたことは？','最近嬉しかったことは？','最近ホッとしたことは？','最近モヤっとしたことは？','最近楽しかったことは？','最近ちょっと不安だったことは？','最近悔しかったことは？','最近ありがたいと思ったことは？','最近うらやましいと思ったことは？','最近緊張したことは？','最近笑ったことは？','最近びっくりしたことは？','疲れたと思ったのは、どんなとき？','ちょっと寂しかったのは、どんなとき？','今日、気持ちが動いた瞬間は？']],
+ ['dump','wish',46,['いつかやろうと思ってることは？','買おうか迷ってるものは？','行ってみたい場所は？','会いたい人は？','食べたいものは？','3年後、どうなっていたい？','もっと増やしたい時間は？','もっと減らしたい時間は？','持っていたいものは？','できるようになりたいことは？','今の暮らしで、変えられるなら変えたいことは？','1日だけ自由に使えるなら、何をする？','ずっと憧れてることは？','お金に余裕があったら、まず何をする？','やってみたい習い事は？']],
+ ['dump','notice',61,['最近見て、覚えておきたいと思ったものは？','最近、新しく知ったことは？','人に教えたくなったことは？','最近読んで、心に残った言葉は？','ふと思いついたことは？','「あ、これ使える」と思ったことは？','最近、うまくいったことは？','前より楽になったことは？','最近、人から学んだことは？','失敗して、わかったことは？','最近、意外だったことは？','最近、変わったなと思うことは？','「そういえば」と思ったことは？','最近気づいた、自分のクセは？','来月の自分に、伝えておきたいことは？']],
+ ['dump','work',76,['仕事で、引っかかってることは？','今日の仕事で、うまくいったことは？','今週の仕事で、いちばん大きいことは？','仕事で、後回しにしてることは？','仕事で、誰かに確認したいことは？','仕事で、最近困ったことは？','仕事で、ありがたかったことは？','仕事で、得意だと感じたことは？','仕事で、手間だと感じてる作業は？','仕事で、やめたいことは？','仕事で、もっとやりたいことは？','仕事で、最近学んだことは？','仕事で、ちょっとモヤっとしたことは？','来週の仕事で、気が重いことは？','仕事で、誰かに頼みたいことは？']],
+ ['widen','',91,['これ、何に似てる？','逆にしたらどうなる？','何かと組み合わせるなら？','10倍の規模なら？','10分の1の規模なら？','お金も時間も無限なら？','誰かに任せるなら、誰に？','別のやり方は他にある？','他の業界では、どうやってる？','5年前なら、どうしてた？','子どもなら、どう考える？','一番ふざけた案を出すなら？','何かを足すなら、何を足す？','誰が一番喜ぶ？ その人のために変えるなら？','まったく違う目的に使うなら？']],
+ ['deepen','',106,['具体的には？ 例を1つ。','一言で言うと？','一番大事なのはどこ？','いつから気になってる？','きっかけは何だった？','誰に関係する？','どんな状態になればOK？','数字にすると、どれくらい？','それが起きるのは、どんなとき？','起きないのは、どんなとき？','それで困るのは誰？','まだわかってないことは？','一言で言えない部分は？','どこが一番モヤっとする？','それは感覚？ それとも事実？']],
+ ['organize','',121,['大きく分けると、何と何？','順番をつけるなら？','原因と結果に分けると？','事実と気持ちに分けると？','今すぐやることと、あとでやることに分けると？','自分で決められることと、決められないことは？','似てるものは、まとめられる？','抜けてる視点は？','関係者は誰と誰？','一番上の目的は何？','その中で、一番重いのは？','時間順に並べると？','同じ話が、別の言い方で出てない？','3つにまとめるなら？','2つが同時に起きたら、どっちが先？']],
+ ['review','',136,['思い込みかもしれないことは？','根拠は？','逆の立場から言うなら？','うまくいかないとしたら、一番の理由は？','前提が崩れるとしたら、何が原因？','一番心配なのは何？','見落としてるかもしれないのは？','反対する人は、何て言う？','都合よく見てるところはない？','例外はある？','うまくいかなかったとき、どうする？','友達が同じ状況なら、何て言う？','1年後の自分から見て、これは大きい？','他人事だとしたら、どう見える？','本当に、それは自分がやること？']],
+ ['decide','',151,['1つだけ残すなら？','やめてもいいことは？','本当はどうしたい？','やらなくていいなら、それでもやる？','どれを選んでも失敗しないとしたら？','後悔が小さいのはどっち？','今すぐ決めるなら？','一番ワクワクするのは？','絶対に譲れないのは？','譲ってもいいのは？','決めなかったら、何が起きる？','迷ってる理由は何？','選ばなかった方で、一番惜しいのは？','期限を決めるなら、いつ？','コインで決めて、がっかりしたのはどっち？']],
+ ['act','',166,['5分でできる次の一歩は？','今日中にできることは？','最初に誰に連絡する？','一番やりたくないのはどれ？ 先に片づける？','明日の朝、最初にやることは？','「もし〇〇になったら△△する」で書くと？','いつ、どこでやる？','邪魔になりそうなことは？ その対策は？','小さくして試すなら？','誰に手伝ってもらう？','終わったとき、どうなってる？','やったかどうか、どう確かめる？','1週間後の自分に、何を残す？','やる気がなくてもできる形にするなら？','まず何を捨てれば動ける？']],
+ ['reflect','',181,['ここまでで、一番大事だったのは？','書き始めた頃と、今で変わったことは？','意外だったことは？','次に活かすなら、何？','誰かに話すとしたら、どこから話す？','ここまでで、うまくいったことは？','ここまでで、うまくいかなかったことは？','思ったより早く進んだことは？','思ったより時間がかかったことは？','続けたいことは？','やめたいことは？','新しく試したいことは？','ここまでで、わかったことを1つ挙げるなら？','まだ残ってる疑問は？','過去の自分に、一言かけるなら？']]];
+const QS=[];QSRC.forEach(([f,sub,st,arr])=>arr.forEach((t,i)=>QS.push({id:st+i,f,sub,t})));
+const QBY=new Map(QS.map(q=>[q.id,q]));
+S.qa=new Map(); // roomId -> {f,subs,cur,answered}
+const qSubs=()=>{const v=LS.get('qsubs',['gen']);return Array.isArray(v)&&v.length?v:['gen']};
+const qKey=(f,subs)=>f==='dump'?'dump:'+(subs.includes('all')?'all':[...subs].sort().join('+')):f;
+function qPool(f,subs){return QS.filter(q=>q.f===f&&(f!=='dump'||subs.includes('all')||subs.includes(q.sub))).map(q=>q.id)}
+function qDraw(f,subs){
+  const key='qbag:'+qKey(f,subs);const pool=qPool(f,subs);if(!pool.length)return null;
+  let bag=(LS.get(key,[])||[]).filter(id=>pool.includes(id));
+  if(!bag.length){bag=[...pool];for(let i=bag.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[bag[i],bag[j]]=[bag[j],bag[i]]}}
+  const id=bag.shift();LS.set(key,bag);return id;
+}
+function qStat(id,i){const s=LS.get('qstats',{});const a=s[id]||[0,0,0];a[i]++;s[id]=a;LS.set('qstats',s)}
+function qShow(rid,f,subs){
+  const id=qDraw(f,subs);if(id==null){toast('出せる問いがありません');return}
+  const prev=S.qa.get(rid);const trail=prev&&prev.f===f&&prev.trail?prev.trail:[];
+  S.qa.set(rid,{f,subs,cur:id,answered:false,trail});qStat(id,0);
+  if(S.roomId===rid&&!S.sel)qRefresh();
+}
+function qRefresh(){const w=$('#qwrap');if(w)w.innerHTML=qBandHTML();renderChat(true)}
+function scrollChatEnd(){const c=$('#chat');if(c)c.scrollTop=c.scrollHeight}
+function qNext(){const rid=S.roomId,a=S.qa.get(rid);if(!a)return;
+  if(!a.answered){qStat(a.cur,1);a.trail.push(a.cur);if(a.trail.length>=3)a.trail=[]}else a.trail=[];
+  qShow(rid,a.f,a.subs)}
+function qEnd(){S.qa.delete(S.roomId);qRefresh()}
+function qAuto(){LS.set('qauto',!LS.get('qauto',false));qRefresh()}
+function qBandHTML(){
+  const a=S.qa.get(S.roomId);if(!a)return '';const f=QFK[a.f];
+  const sub=a.f==='dump'?(a.subs.includes('all')?'すべて':a.subs.map(s=>QSUBL[s]).join('・')):'';
+  const auto=LS.get('qauto',false);
+  return `<div class="qband"><span class="qb-t">${f.ic} ${f.t}${sub?`<small>${esc(sub)}</small>`:''}</span>
+    <button class="qb-auto${auto?' on':''}" data-act="qAuto" title="1件書いたら次の問いへ">自動で次へ</button>
+    <button class="qb-next" data-act="qNext">次</button>
+    <button class="qb-x" data-act="qEnd" title="問いをやめる">✕</button></div>`;
+}
+function qBubbleHTML(){
+  const a=S.qa.get(S.roomId);if(!a||a.answered)return '';const q=QBY.get(a.cur);if(!q)return '';
+  const tr=(a.trail||[]).map(id=>`<div class="msg ai qtmp qold"><div class="line"><div class="bub ai">${esc(QBY.get(id)?.t||'')}</div></div></div><div class="msg qskip"><div class="line"><div class="bub">次</div></div></div>`).join('');
+  return tr+`<div class="msg ai qtmp"><div class="line"><div class="bub ai">${esc(q.t)}</div></div></div>`;
+}
+/* 送信時に呼ぶ。true を返したらメモとしては保存しない（「次」） */
+async function qOnSend(text){
+  const rid=S.roomId,a=S.qa.get(rid);if(!a)return false;
+  if(/^\s*(次|つぎ)\s*$/.test(text)&&!S.pending.length){const ta=$('#ta');if(ta){ta.value='';autoGrow(ta);updSend()}LS.set('draft:'+rid,'');qNext();return true}
+  if(!a.answered){
+    const q=QBY.get(a.cur);
+    const qm={id:uid(),roomId:rid,text:q.t,images:[],createdAt:now()-1,exportedAt:null,exportId:null,by:'ai',qid:q.id};
+    await saveMsg(qm);a.answered=true;a.trail=[];qStat(q.id,2);
+  }
+  return false;
+}
+function qAfterSend(){const a=S.qa.get(S.roomId);if(a&&a.answered&&LS.get('qauto',false))qShow(S.roomId,a.f,a.subs)}
+function qSheet(){
+  const rid=S.roomId;if(!rid)return;let subs=qSubs();
+  const sh=openSheet(`<h3>💡 問いかけ</h3>
+    <div class="qgrid">${QF.map(f=>`<button data-f="${f.k}"><span class="qi">${f.ic}</span><b>${f.t}</b><small>${f.d}</small></button>`).join('')}</div>
+    <div class="qsubs"><div class="qsl">吐き出すで出す分野</div><div class="qsc"></div></div>
+    <p class="note" style="margin-top:10px">合わない問いは「次」で飛ばせます。答えた問いだけがトークに残ります。</p>`);
+  const drawSubs=()=>{sh.querySelector('.qsc').innerHTML=[['all','すべて'],...QSUB].map(([k,l])=>`<span class="chip${subs.includes(k)?' on':''}" data-s="${k}">${l}</span>`).join('');
+    sh.querySelectorAll('[data-s]').forEach(c=>c.onclick=()=>{const k=c.dataset.s;
+      if(k==='all')subs=['all'];else{subs=subs.filter(x=>x!=='all');subs=subs.includes(k)?subs.filter(x=>x!==k):[...subs,k];if(!subs.length)subs=['gen']}
+      LS.set('qsubs',subs);drawSubs()})};
+  drawSubs();
+  sh.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{closeSheet();qShow(rid,b.dataset.f,b.dataset.f==='dump'?subs:[])});
+}
+async function qStatsCopy(){
+  const s=LS.get('qstats',{});const rows=QS.map(q=>{const a=s[q.id]||[0,0,0];return {q,sh:a[0],sk:a[1],an:a[2]}}).filter(r=>r.sh);
+  rows.sort((a,b)=>(b.sk/b.sh)-(a.sk/a.sh)||b.sh-a.sh);
+  const txt=`NSNS 問いの統計（${ymd(now())}・この端末）\n表示した問い ${rows.length}/${QS.length}\n`+rows.map(r=>`#${r.q.id} 表示${r.sh} 次${r.sk} 答${r.an}｜${QFK[r.q.f].t}${r.q.sub?'・'+QSUBL[r.q.sub]:''}｜${r.q.t}`).join('\n');
+  try{await navigator.clipboard.writeText(txt);toast('問いの統計をコピーしました')}catch(e){openSheet(`<h3>問いの統計</h3><textarea class="inp" style="width:100%;height:50vh">${esc(txt)}</textarea>`)}
+}
+
+/* =========================================================
    NAV & EVENTS
    ========================================================= */
 function openRoom(id,msgId){S.roomId=id;S.pending=[];S.sel=null;S.win=200;S.jump=msgId||null;document.body.classList.add('in-room');renderRoom();renderList();setTimeout(()=>{if(!isTouch()&&!msgId)$('#ta')?.focus()},50)}
@@ -1796,6 +1934,7 @@ const ACT={
   pickImg:()=>$('#fileImg').click(),
   rmPending:el=>{S.pending.splice(+el.dataset.i,1);renderPending()},
   send:sendMsg,
+  qSheet:()=>qSheet(),qNext:()=>qNext(),qEnd:()=>qEnd(),qAuto:()=>qAuto(),
   loadMore:()=>{const c=$('#chat');const h=c.scrollHeight;S.win+=200;renderChat(false);c.scrollTop=c.scrollHeight-h},
   tapMsg:(el,e)=>{if(e.target.closest('a'))return;if(S.sel)selToggle(el.dataset.id)},
   msgMenu:(el,e)=>{e.stopPropagation();msgMenu(el.dataset.id)},
