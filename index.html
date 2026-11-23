@@ -3686,15 +3686,16 @@ async function syncSheet(){
 
 /* 新しい版の知らせ：開いている間に本番が更新されたら「更新」を出す（押すまで何も変えない） */
 function verHash(t){let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return t.length+':'+h}
-async function verFetch(){const r=await fetch('/index.html?_v='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;return verHash(await r.text())}
+const verScripts=root=>verHash([...root.querySelectorAll('script:not([src])')].map(x=>x.textContent).join('\n'));
+async function verFetch(){const r=await fetch('/index.html?_v='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;return verScripts(new DOMParser().parseFromString(await r.text(),'text/html'))}
 function verWatch(){
   if(!/^https?:$/.test(location.protocol)||location.protocol==='file:')return;
-  let base=null,shown=false,last=0;
+  let base=verScripts(document),shown=false,last=0;
   const show=()=>{if(shown)return;shown=true;const b=document.createElement('div');b.id='verbar';
     b.innerHTML='<span>新しい版があります</span><button>更新</button><button class="x" aria-label="閉じる">×</button>';
     b.querySelector('button').onclick=()=>location.reload();b.querySelector('.x').onclick=()=>b.remove();document.body.appendChild(b)};
   const check=async()=>{if(shown||document.hidden||!navigator.onLine||Date.now()-last<20000)return;last=Date.now();
-    try{const h=await verFetch();if(base===null)base=h;else if(h!==base)show()}catch(e){}};
+    try{const h=await verFetch();if(h!==base)show()}catch(e){}};
   check();
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)check()});
   setInterval(check,10*60*1000);
