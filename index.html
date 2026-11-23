@@ -455,6 +455,16 @@ details.adv .in{padding:0 14px 14px}
 .fcnt{flex:none;font-size:11px;color:var(--sub);white-space:nowrap}
 .fcnt b{font-weight:600;color:#5E8A4F}
 .fv{font-size:12px;margin-right:3px}
+.dvh{font-size:12px;font-weight:700;color:var(--sub);margin:14px 4px 6px}
+.dvrow{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:14px;padding:11px 12px;margin-bottom:6px;box-shadow:var(--shadow);cursor:pointer}
+.dvrow .ic{font-size:20px;flex:none}.dvrow .t{flex:1;min-width:0;font-size:15px}.dvrow small{display:block;font-size:11.5px;color:var(--sub);margin-top:1px}
+.dvfav,.dvfavb{font-size:20px;color:#C9BFB4}.dvfav.on,.dvfavb.on{color:#E9A93C}
+.dvempty{font-size:12.5px;color:var(--sub);padding:6px 6px 10px}
+.dvf{display:flex;flex-direction:column;gap:6px;margin:4px 0 8px}
+.dvgrp{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.dvday{font-size:11px;color:var(--sub);text-align:center;margin:12px 0 6px}
+.dvnote{font-size:11px;color:var(--sub);margin-left:6px}
+.lvhost .lvc{margin-bottom:6px}
 </style>
 </head>
 <body>
@@ -1516,13 +1526,18 @@ async function setArchived(rooms,on){
 /* ---- 一覧（トークをまたいで、メモ単位で絞る） ---- */
 const LV_DEF={q:'',kinds:[],sts:[],pin:false,arch:false,ai:false,tag:''};
 let LV=Object.assign({},LV_DEF,LS.get('lv',{}));
-function lvCollect(){
-  const q=LV.q.trim().toLowerCase(),ks=new Set(LV.kinds),ss=new Set(LV.sts),tag=LV.tag.toLowerCase();const out=[];
+const RANGE_MS={week:7*86400000,month:30*86400000,m3:90*86400000};
+function lvCollect(F){
+  F=F||LV;
+  const q=(F.q||'').trim().toLowerCase(),ks=new Set(F.kinds||[]),ss=new Set(F.sts||[]),tag=(F.tag||'').toLowerCase();const out=[];
+  const since=RANGE_MS[F.range]?now()-RANGE_MS[F.range]:0;
   for(const m of S.msgs.values()){
     const r=S.nodes.get(m.roomId);if(!r)continue;
-    if(r.archived&&!LV.arch)continue;
-    if(m.by==='ai'&&!LV.ai)continue;
-    if(LV.pin&&!m.pinned)continue;
+    if(since&&m.createdAt<since)continue;
+    if(F.docsOnly&&!r.docs)continue;
+    if(r.archived&&!F.arch)continue;
+    if(m.by==='ai'&&!F.ai)continue;
+    if(F.pin&&!m.pinned)continue;
     if(ks.size&&!ks.has(m.kind||'none'))continue;
     if(ss.size&&!ss.has(m.st||'none'))continue;
     if(q&&!(m.text||'').toLowerCase().includes(q))continue;
@@ -2230,10 +2245,132 @@ async function ibSend(){
 function ibNextQ(){if(S.ibq)qStat(S.ibq.cur,1);ibDraw();$('#ibQ').innerHTML=ibQHTML()}
 function ibQToggle(){const on=!LS.get('ibq',true);LS.set('ibq',on);S.ibq=null;$('#ibQ').innerHTML=ibQHTML()}
 async function openInbox(){const b=await ensureInbox();S.tab='memo';LS.set('tab','memo');S.cwd=null;openRoom(b.id)}
-/* ---- データ タブ：一覧をそのまま埋め込む ---- */
+/* ---- データ タブ：ビュー（束ね方＋フィルタ）と、そこから開く抽出ルーム ---- */
+/* 抽出ルーム＝条件で毎回引いて見せる部屋（コピーを作らない）。タップで元のトークへ */
+const DV_GROUPS=[['kind','種類別'],['tag','タグ別'],['digest','資料化の月別'],['none','まとめて1室']];
+const DV_RANGES=[['','全期間'],['week','今週'],['month','1か月'],['m3','3か月']];
+const dvF=(o)=>Object.assign({q:'',kinds:[],sts:[],pin:false,arch:false,ai:false,tag:'',range:'',docsOnly:false},o||{});
+const DV_PRESETS=[
+  {id:'p:kind',name:'種類別',ic:'🗂',group:'kind',f:dvF()},
+  {id:'p:tag',name:'タグ別',ic:'🏷',group:'tag',f:dvF()},
+  {id:'p:digest',name:'資料化の月別',ic:'📎',group:'digest',f:dvF({docsOnly:true})},
+  {id:'p:undone',name:'未完了のタスク',ic:'☑️',group:'none',f:dvF({kinds:['task'],sts:['draft','fixed','none']})},
+  {id:'p:week',name:'今週のメモ',ic:'🗓',group:'kind',f:dvF({range:'week'})},
+  {id:'p:ann',name:'アナウンス一覧',ic:'📢',group:'none',f:dvF({pin:true})},
+  {id:'p:all',name:'全部まとめて',ic:'💬',group:'none',f:dvF()},
+];
+const dvSaved=()=>LS.get('views',[]).map(v=>Object.assign({},v,{f:dvF(v.f)}));
+const dvSaveAll=a=>LS.set('views',a);
+S.dv=S.dv||{mode:'home',v:null,gv:null};
+function dvKey(m,group){
+  if(group==='kind')return [m.kind||'none'];
+  if(group==='tag'){const t=[...msgTags(m)];return t.length?t:['__none'];}
+  if(group==='digest'){const d=new Date(m.createdAt);return [`${d.getFullYear()}-${pad(d.getMonth()+1)}`]}
+  return ['all'];
+}
+function dvLabel(group,k){
+  if(group==='kind')return k==='none'?'未分類':kindText(k);
+  if(group==='tag')return k==='__none'?'タグなし':'#'+k;
+  if(group==='digest'){const[y,mo]=k.split('-');return `${y}年${+mo}月`}
+  return '全部';
+}
+function dvGroups(v){
+  const ms=lvCollect(v.f);const g=new Map();
+  for(const m of ms)for(const k of dvKey(m,v.group)){if(!g.has(k))g.set(k,[]);g.get(k).push(m)}
+  let arr=[...g].map(([k,l])=>({k,label:dvLabel(v.group,k),n:l.length,last:Math.max(...l.map(m=>m.createdAt))}));
+  if(v.group==='kind'){const o=[...KINDS.map(k=>k.id),'none'];arr.sort((a,b)=>o.indexOf(a.k)-o.indexOf(b.k))}
+  else if(v.group==='tag')arr.sort((a,b)=>(a.k==='__none')-(b.k==='__none')||b.n-a.n);
+  else arr.sort((a,b)=>b.k.localeCompare(a.k));
+  return arr;
+}
+function dvRoomMsgs(v,gv){
+  return lvCollect(v.f).filter(m=>gv==null||v.group==='none'||dvKey(m,v.group).includes(gv)).sort((a,b)=>a.createdAt-b.createdAt);
+}
+const dvOpened=()=>S.dv.v;
+function dvTitle(v,gv){return gv==null||v.group==='none'?v.name:`${v.name} › ${dvLabel(v.group,gv)}`}
+function dvFilterHTML(v){
+  const f=v.f,g=v.group;
+  const chips=(arr,cur,key,multi)=>arr.map(([id,l])=>`<span class="chip ${multi?(cur.includes(id)?'in':''):(cur===id?'in':'')}" data-act="dv" data-d="${key}" data-v="${esc(id)}">${l}</span>`).join('');
+  const tags=allTags().slice(0,16);if(f.tag&&!tags.includes(f.tag))tags.unshift(f.tag);
+  return `<div class="dvf"><div class="chips">${chips(DV_RANGES,f.range||'','range',false)}</div>
+    ${g==='kind'?'':`<div class="chips">${chips([...KINDS.map(k=>[k.id,k.ic+k.label]),['none','未分類']],f.kinds,'kind',true)}</div>`}
+    <div class="chips">${chips([...STS.map(x=>[x.id,x.label]),['none','状態なし']],f.sts,'st',true)}</div>
+    ${g==='tag'||!tags.length?'':`<div class="chips">${tags.map(t=>`<span class="chip ${f.tag===t?'in':''}" data-act="dv" data-d="tag" data-v="${esc(t)}">#${esc(t)}</span>`).join('')}</div>`}</div>`;
+}
+function dvCardHTML(m){
+  const r=S.nodes.get(m.roomId);const ai=m.by==='ai';
+  return `<div class="lvc${ai?' ai':''}" data-act="dv" data-d="jump" data-id="${m.id}"><div class="lvh">${ai?'':`<span class="kc">${m.kind?kindText(m.kind):'未分類'}</span>`}${m.st?`<span class="sc ${m.st}">${STL[m.st]}</span>`:''}${m.pinned?'<span>📢</span>':''}<span class="rm">${r.archived?'🗄 ':''}${r.docs?'📌 ':''}${esc(r.name)} · ${fmtTime(m.createdAt)}</span></div><div class="lvt">${esc((m.text||'📷 画像').slice(0,300))}</div></div>`;
+}
 function renderData(P){
-  P.innerHTML=`<div class="top"><div class="brand">データ <small>メモを横断して見る</small></div></div><div class="scroll" id="dataScroll"><div class="lvhost"></div></div>`+navHTML();
-  listView(P.querySelector('.lvhost'));
+  const D=S.dv;let body='',head='';
+  if(D.mode==='home'||!D.v){
+    const saved=dvSaved(),fav=saved.filter(v=>v.fav);
+    const row=(v,ic)=>`<div class="dvrow" data-act="dv" data-d="open" data-id="${esc(v.id)}"><span class="ic">${ic||(v.gv!=null?'💬':'🗂')}</span><div class="t">${esc(v.name)}<small>${DV_GROUPS.find(x=>x[0]===v.group)?.[1]||''}${v.gv!=null?' › '+esc(dvLabel(v.group,v.gv)):''}</small></div>${v.id.startsWith('p:')?'':`<button class="dvfav${v.fav?' on':''}" data-act="dv" data-d="fav" data-id="${esc(v.id)}">${v.fav?'★':'☆'}</button>`}</div>`;
+    head=`<div class="top"><div class="brand">データ <small>束ねて俯瞰する</small></div><button class="icon" data-act="dv" data-d="search" title="条件を細かく探す">${ICONS.search}</button></div>`;
+    body=`${fav.length?`<div class="dvh">⭐ お気に入り</div>${fav.map(v=>row(v)).join('')}`:''}
+      <div class="dvh">はじめから使えるビュー</div>${DV_PRESETS.map(v=>row(v,v.ic)).join('')}
+      <div class="dvh">マイビュー</div>${saved.filter(v=>!v.fav).map(v=>row(v)).join('')||'<div class="dvempty">ビューを開いて「💾 保存」すると、ここに並びます</div>'}`;
+  }else{
+    const v=D.v,gv=D.gv;const inRoom=D.mode==='room';
+    const saved=v.id&&!v.id.startsWith('p:');
+    if(inRoom){
+      const ms=dvRoomMsgs(v,gv);let day='';
+      body=`${dvFilterHTML(v)}<div class="stat"><b>${ms.length}</b>件 <span class="dvnote">条件で引いて表示。編集は元のトークで</span></div>`
+        +(ms.map(m=>{const d=ymd(m.createdAt);let h='';if(d!==day){day=d;h=`<div class="dvday">${dayLabel(m.createdAt)}</div>`}return h+dvCardHTML(m)}).join('')||'<div class="empty" style="padding:30px">条件に合うメモがありません</div>');
+    }else{
+      const gs=dvGroups(v);
+      body=`${dvFilterHTML(v)}<div class="dvh">${DV_GROUPS.find(x=>x[0]===v.group)[1]}</div><div class="dvgrp">${DV_GROUPS.filter(x=>x[0]!=='none').map(([id,l])=>`<span class="chip ${v.group===id?'in':''}" data-act="dv" data-d="group" data-v="${id}">${l}</span>`).join('')}<span class="chip" data-act="dv" data-d="group" data-v="none">まとめて1室</span></div>`
+        +(gs.map(g=>`<div class="dvrow" data-act="dv" data-d="room" data-v="${esc(g.k)}"><span class="ic">💬</span><div class="t">${esc(g.label)}<small>${g.n}件 · 最新 ${fmtTime(g.last)}</small></div></div>`).join('')||'<div class="empty" style="padding:30px">条件に合うメモがありません</div>');
+    }
+    head=`<div class="top"><button class="icon" data-act="dv" data-d="back" title="戻る">${ICONS.back}</button>
+      <div class="ttl"><div class="tx"><div class="nm">${esc(dvTitle(v,inRoom?gv:null))}</div><div class="sb">${inRoom?'抽出ルーム':'ビュー'}${saved?'':' · 未保存'}</div></div></div>
+      <button class="icon dvfavb${v.fav?' on':''}" data-act="dv" data-d="${saved?'favcur':'save'}" title="${saved?'お気に入り':'ビューを保存'}">${saved?(v.fav?'★':'☆'):'💾'}</button>
+      <button class="icon" data-act="dv" data-d="menu" title="メニュー">${ICONS.more}</button></div>`;
+  }
+  P.innerHTML=head+`<div class="scroll" id="dataScroll"><div class="lvhost">${body}</div></div>`+navHTML();
+}
+async function dvPersist(v){ // 保存済みビューの変更を反映
+  if(!v.id||v.id.startsWith('p:'))return;
+  const a=dvSaved().map(x=>x.id===v.id?{id:v.id,name:v.name,group:v.group,f:v.f,fav:!!v.fav,gv:v.gv}:x);dvSaveAll(a);
+}
+async function dvSaveCur(withRoom){
+  const D=S.dv,v=D.v;const base=withRoom&&D.gv!=null&&v.group!=='none'?dvTitle(v,D.gv):v.name;
+  const name=await promptSheet('ビューを保存',base,'名前');if(!name)return;
+  const nv={id:uid(),name,group:v.group,f:clone(v.f),fav:false};if(withRoom&&D.gv!=null&&v.group!=='none')nv.gv=D.gv;
+  dvSaveAll([...dvSaved().map(x=>({id:x.id,name:x.name,group:x.group,f:x.f,fav:!!x.fav,gv:x.gv})),nv]);
+  D.v=Object.assign({},nv);toast(`「${name}」を保存しました`);renderList();
+}
+function dvAct(el,e){
+  if(e)e.stopPropagation();const D=S.dv,d=el.dataset.d;let v=D.v;
+  const detach=()=>{if(v&&(!v.id||v.id.startsWith('p:'))&&v.id!==null){D.v=v={id:null,name:v.name,group:v.group,f:v.f}}};
+  const touchF=()=>{dvPersist(v);renderList()};
+  switch(d){
+    case 'open':{const id=el.dataset.id;const sv=id.startsWith('p:')?DV_PRESETS.find(x=>x.id===id):dvSaved().find(x=>x.id===id);if(!sv)break;
+      D.v=clone(sv);D.v.f=dvF(D.v.f);if(sv.gv!=null){D.gv=sv.gv;D.mode='room'}else{D.gv=null;D.mode='groups'}
+      if(id.startsWith('p:')&&D.v.group==='none'){D.mode='room';D.gv=null}renderList();break}
+    case 'room':D.gv=el.dataset.v;D.mode='room';renderList();break;
+    case 'back':if(D.mode==='room'&&D.v.group!=='none'&&!(D.v.gv!=null)){D.mode='groups';D.gv=null}else{D.mode='home';D.v=null;D.gv=null}renderList();break;
+    case 'group':if(v){detach();v.group=el.dataset.v;if(v.group==='digest')v.f.docsOnly=true;else if(v.f.docsOnly&&!(v.id&&v.id.startsWith('p:digest')))v.f.docsOnly=false;D.gv=null;D.mode=v.group==='none'?'room':'groups';touchF()}break;
+    case 'range':if(v){detach();v.f.range=el.dataset.v;touchF()}break;
+    case 'kind':if(v){detach();const x=el.dataset.v;v.f.kinds=v.f.kinds.includes(x)?v.f.kinds.filter(y=>y!==x):[...v.f.kinds,x];touchF()}break;
+    case 'st':if(v){detach();const x=el.dataset.v;v.f.sts=v.f.sts.includes(x)?v.f.sts.filter(y=>y!==x):[...v.f.sts,x];touchF()}break;
+    case 'tag':if(v){detach();v.f.tag=v.f.tag===el.dataset.v?'':el.dataset.v;touchF()}break;
+    case 'fav':{const a=dvSaved().map(x=>x.id===el.dataset.id?{...x,fav:!x.fav}:x);dvSaveAll(a);renderList();break}
+    case 'favcur':if(v&&v.id){v.fav=!v.fav;dvPersist(v);renderList()}break;
+    case 'save':{if(D.mode==='room'&&D.gv!=null&&v.group!=='none')menuSheet('ビューを保存',[
+        {icon:'🗂',label:'このビュー全体を保存',sub:'束ね方とフィルタを保存',fn:()=>dvSaveCur(false)},
+        {icon:'💬',label:'この抽出ルームだけ保存',sub:`「${dvLabel(v.group,D.gv)}」を直接開く`,fn:()=>dvSaveCur(true)}]);else dvSaveCur(false);break}
+    case 'jump':{const m=S.msgs.get(el.dataset.id);if(m)openRoom(m.roomId,m.id);break}
+    case 'search':listView();break;
+    case 'menu':{if(!v)break;const ms=D.mode==='room'?dvRoomMsgs(v,D.gv):lvCollect(v.f);const l=ms.filter(m=>m.by!=='ai');
+      const saved=v.id&&!v.id.startsWith('p:');
+      menuSheet(dvTitle(v,D.mode==='room'?D.gv:null),[
+        {icon:'↗',label:'書き出す',sub:`${l.length}件`,fn:()=>{if(!l.length){toast('書き出すメモがありません');return}openExport({ids:l.map(m=>m.id)})}},
+        {icon:'🏷',label:'AIで分類する',sub:'未分類だけ渡すなら、先に「未分類」で絞る',fn:()=>{if(!l.length)return;copyPrompt('classify',{msgs:l})}},
+        saved?{icon:'✏️',label:'名前を変える',fn:async()=>{const n=await promptSheet('ビューの名前',v.name,'名前');if(n){v.name=n;dvPersist(v);renderList()}}}:null,
+        saved?{icon:'🗑',label:'このビューを消す',sub:'中のメモは消えません',danger:true,fn:async()=>{if(!await confirmSheet('このビューを消しますか？','メモは消えません','消す',true))return;dvSaveAll(dvSaved().filter(x=>x.id!==v.id).map(x=>({id:x.id,name:x.name,group:x.group,f:x.f,fav:!!x.fav,gv:x.gv})));D.mode='home';D.v=null;renderList()}}:null,
+      ]);break}
+  }
 }
 /* ---- フォルダの中身の数・問いの進み具合 ---- */
 function folderCounts(n){
@@ -2331,7 +2468,7 @@ const ACT={
   pickImg:()=>$('#fileImg').click(),
   rmPending:el=>{S.pending.splice(+el.dataset.i,1);renderPending()},
   send:sendMsg,
-  tab:el=>setTab(el.dataset.t),openInbox:()=>openInbox(),ibSend:()=>ibSend(),ibNextQ:()=>ibNextQ(),ibQToggle:()=>ibQToggle(),
+  tab:el=>setTab(el.dataset.t),dv:(el,e)=>dvAct(el,e),openInbox:()=>openInbox(),ibSend:()=>ibSend(),ibNextQ:()=>ibNextQ(),ibQToggle:()=>ibQToggle(),
   qSheet:()=>qSheet(),qNext:()=>qNext(),qEnd:()=>qEnd(),qAuto:()=>qAuto(),mEnough:()=>mEnough(),annJump:el=>annJump(el),
   msgAnn:el=>{mswClose();const m=S.msgs.get(el.dataset.id);if(m)togglePin(m)},msgRoom:el=>{mswClose();const m=S.msgs.get(el.dataset.id);if(m)msgToRoom(m)},
   loadMore:()=>{const c=$('#chat');const h=c.scrollHeight;S.win+=200;renderChat(false);c.scrollTop=c.scrollHeight-h},
