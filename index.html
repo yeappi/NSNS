@@ -1900,38 +1900,38 @@ const PROMPTS={
 # できること（返し方）
 
 ## 分類：各メモに種類・状態・タグを付ける（本文は変えない）
-{"nsns":1,"type":"classify","ref":"${X.ref}","items":[{"id":"m1","kind":"task","st":"draft","tags":["タグ"]}],"newTags":["新しく作ったタグ"]}
+{"format":"NSNS-JSON","v":1,"type":"classify","ref":"${X.ref}","items":[{"id":"m1","kind":"task","st":"draft","tags":["タグ"]}],"newTags":["新しく作ったタグ"]}
 - kind（1件に1つ）: task＝やること ／ log＝起きたこと ／ info＝調べた情報・数字 ／ idea＝思いつき ／ question＝まだ答えが出ていない問い ／ feeling＝感想・気持ち ／ null＝どれとも言えない
 - st: draft＝未確定・未着手 ／ fixed＝決めたこと ／ done＝終わったこと ／ null＝状態を持たないもの
 - tags は0〜3個です。まず【既存のタグ】から選び、新しく作ったタグは newTags にも入れてください。
 - 対象のメモはすべて items に入れてください。
 
 ## 分解：話題が混ざったメモを、1件1話題に分ける
-{"nsns":1,"type":"split","ref":"${X.ref}","items":[{"id":"m1","parts":["1つ目の話題","2つ目の話題"]}]}
+{"format":"NSNS-JSON","v":1,"type":"split","ref":"${X.ref}","items":[{"id":"m1","parts":["1つ目の話題","2つ目の話題"]}]}
 - 分けるメモだけを入れてください。元の内容は、どれか1つの part に漏れなく入れてください。
 
 ## データ化：表にできる情報を1つの表にする
-{"nsns":1,"type":"data","ref":"${X.ref}","title":"表の名前","columns":["日付","項目","金額"],"rows":[{"from":"m1","cells":["11/20","電気代","8,400円"]}]}
+{"format":"NSNS-JSON","v":1,"type":"data","ref":"${X.ref}","title":"表の名前","columns":["日付","項目","金額"],"rows":[{"from":"m1","cells":["11/20","電気代","8,400円"]}]}
 - 列は3〜7個です。1行が1件の記録で、from には元になったメモの id を入れてください。
 - 書かれていない値は "" にしてください。
 
 ## 資料化：読み返せるまとめ1本にする
-{"nsns":1,"type":"digest","ref":"${X.ref}","title":"20字以内","lines":["■ 結論・決めたこと","・…","■ 残っている疑問","・…","■ 次にやること","・…"],"archive":["r1"]}
+{"format":"NSNS-JSON","v":1,"type":"digest","ref":"${X.ref}","title":"20字以内","lines":["■ 結論・決めたこと","・…","■ 残っている疑問","・…","■ 次にやること","・…"],"archive":["r1"]}
 - 1行を配列の1要素にしてください。
 - archive には、もう書き足さなくてよいトークの id だけを入れてください。迷うものは入れないでください。
 
 ## ブレスト：考えるべき論点を出して、論点ごとに問いを置く
-{"nsns":1,"type":"brainstorm","ref":"${X.ref}","folder":{"title":"15字以内","rooms":[{"key":"r1","title":"論点","questions":["答えやすい問い"]}]}}
+{"format":"NSNS-JSON","v":1,"type":"brainstorm","ref":"${X.ref}","folder":{"title":"15字以内","rooms":[{"key":"r1","title":"論点","questions":["答えやすい問い"]}]}}
 - 論点は3〜8個、問いは各1〜3個にしてください。
 
 ## 次の問い：書いた答えを踏まえて、トークごとに次の問いを足す
 向く場面：トークに私の答えが溜まっていて、もう一段深掘りしたい。
-{"nsns":1,"type":"next","ref":"${X.ref}","rooms":[{"id":"r1","questions":["次の問い","もう1つの問い"]}]}
+{"format":"NSNS-JSON","v":1,"type":"next","ref":"${X.ref}","rooms":[{"id":"r1","questions":["次の問い","もう1つの問い"]}]}
 - 各トークに1〜2個です。id は見出しの「id:」の後ろ（r1, r2 …）をそのまま使ってください。
 
 ## AI思考法：合う思考法を選び、トークごとに専用の問いを作る
 向く場面：どう考えれば深まるか分からない。思考法のレベル（1＝全体で1つ ／ 2＝TOP3 ／ 3〜5＝トークごとに専用の問いも作る）を私に選ばせてください。
-{"nsns":1,"type":"think","ref":"${X.ref}","level":3,"overall":[{"method":"M3","why":"20字以内"}],"rooms":[{"id":"r1","priority":"高","why":"…","recommend":[{"method":"M1","why":"…"}],"custom":[{"name":"15字以内","questions":["…","…"]}]}]}
+{"format":"NSNS-JSON","v":1,"type":"think","ref":"${X.ref}","level":3,"overall":[{"method":"M3","why":"20字以内"}],"rooms":[{"id":"r1","priority":"高","why":"…","recommend":[{"method":"M1","why":"…"}],"custom":[{"name":"15字以内","questions":["…","…"]}]}]}
 - method は、下の【思考法カタログ】のIDだけを使ってください。
 - レベル1〜2では rooms を空にしてください。レベル3以上で、対象のトークにだけ custom を入れ、ほかは空にしてください。
 
@@ -1980,7 +1980,7 @@ ${KIND_DEF}
 ${tagListForAI()}
 
 # 出力形式
-{"nsns":1,"type":"classify","ref":"${X.ref}","items":[{"id":"m1","kind":"idea","st":"draft","tags":["UI"]}],"newTags":["新しく作ったタグ"]}
+{"format":"NSNS-JSON","v":1,"type":"classify","ref":"${X.ref}","items":[{"id":"m1","kind":"idea","st":"draft","tags":["UI"]}],"newTags":["新しく作ったタグ"]}
 - id は【メモ】の [ ] の中（m1, m2 …）をそのまま使う。ref もそのまま。
 - ${msgs.length}件すべてを入れる。
 
@@ -1999,7 +1999,7 @@ ${P_FLOW}
 - メモにない事実を決めつけない。
 
 # 出力形式
-{"nsns":1,"type":"brainstorm","ref":"${X.ref}","folder":{"title":"…","rooms":[{"key":"r1","title":"…","questions":["…","…"]}]}}
+{"format":"NSNS-JSON","v":1,"type":"brainstorm","ref":"${X.ref}","folder":{"title":"…","rooms":[{"key":"r1","title":"…","questions":["…","…"]}]}}
 - ref はそのまま使う。
 
 # メモ（${msgs.length}件）
@@ -2016,7 +2016,7 @@ ${P_FLOW}
 - 1問ずつ短く。
 
 # 出力形式
-{"nsns":1,"type":"questions","ref":"${X.ref}","rooms":[{"id":"r1","questions":["…"]}]}
+{"format":"NSNS-JSON","v":1,"type":"questions","ref":"${X.ref}","rooms":[{"id":"r1","questions":["…"]}]}
 - id は各トークの見出しの「id:」の後ろ（r1, r2 …）をそのまま使う。ref もそのまま。
 
 # トーク（${rooms.length}個）
@@ -2033,7 +2033,7 @@ ${P_DIRECT}
 - タグ（#〜）は、その話題の part に残す。
 
 # 出力形式
-{"nsns":1,"type":"split","ref":"${X.ref}","items":[{"id":"m1","parts":["1つ目の話題","2つ目の話題"]}]}
+{"format":"NSNS-JSON","v":1,"type":"split","ref":"${X.ref}","items":[{"id":"m1","parts":["1つ目の話題","2つ目の話題"]}]}
 - id は【メモ】の [ ] の中（m1, m2 …）をそのまま使う。ref もそのまま。
 
 # メモ（${msgs.length}件）
@@ -2052,7 +2052,7 @@ ${P_FLOW}
 - title は表の名前を15字以内で。
 
 # 出力形式
-{"nsns":1,"type":"data","ref":"${X.ref}","title":"…","columns":["日付","項目","金額"],"rows":[{"from":"m1","cells":["11/20","電気代","8,400円"]}]}
+{"format":"NSNS-JSON","v":1,"type":"data","ref":"${X.ref}","title":"…","columns":["日付","項目","金額"],"rows":[{"from":"m1","cells":["11/20","電気代","8,400円"]}]}
 - from は【メモ】の [ ] の中（m1, m2 …）。ref はそのまま。
 
 # メモ（${msgs.length}件）
@@ -2071,7 +2071,7 @@ ${P_FLOW}
 - title は20字以内。本文は lines に1行ずつ入れる（見出しも箇条書きも1行＝1要素）。
 
 # 出力形式
-{"nsns":1,"type":"digest","ref":"${X.ref}","title":"…","lines":["■ 結論・決めたこと","・…","■ 残っている疑問","・…"],"archive":["r1"]}
+{"format":"NSNS-JSON","v":1,"type":"digest","ref":"${X.ref}","title":"…","lines":["■ 結論・決めたこと","・…","■ 残っている疑問","・…"],"archive":["r1"]}
 - archive の id は各トークの見出しの「id:」の後ろ（r1, r2 …）。ref はそのまま。
 
 # トーク（${rooms.length}個）
@@ -2125,7 +2125,7 @@ ${treeForAI(rec)}
 
 # 出力形式
 ## 1・2：メモと問い
-{"nsns":1,"type":"memos","ref":"${ref}","title":"このまとまりの名前（20字以内）","folders":[{"title":"大分類","folders":[{"title":"テーマ","rooms":[{"title":"元の考え","memos":[{"text":"原文","kind":"idea","st":null,"tags":["タグ"]}]},{"title":"最初の問い（トーク名）"},{"title":"問いを並べるトーク","questions":["最初の問い","次の問い"]},{"title":"思考法のトーク","method":"M5","why":"20字以内の理由"}]}]}],"rooms":[]}
+{"format":"NSNS-JSON","v":1,"type":"memos","ref":"${ref}","title":"このまとまりの名前（20字以内）","folders":[{"title":"大分類","folders":[{"title":"テーマ","rooms":[{"title":"元の考え","memos":[{"text":"原文","kind":"idea","st":null,"tags":["タグ"]}]},{"title":"最初の問い（トーク名）"},{"title":"問いを並べるトーク","questions":["最初の問い","次の問い"]},{"title":"思考法のトーク","method":"M5","why":"20字以内の理由"}]}]}],"rooms":[]}
 - folders は入れ子にできます。フォルダが要らないときは、最上位の rooms だけで構いません。
 - rooms の title は60字以内です。memos・questions・method・why は省略できます。メモと問いは、同じトークに両方入れても構いません。
 - memos も questions も method も無いトークは、トーク名が最初の問いになります。method だけなら、標準の問いが入ります。枠型・対象型は "targets":["A案","B案"] で対象を指定できます。
@@ -2140,11 +2140,11 @@ ${treeForAI(rec)}
 - 同じJSONの中で新しく作るフォルダやトークには、番号は付きません。入れ子で書いてください。
 
 ## 3：データ化
-{"nsns":1,"type":"data","ref":"${ref}","title":"表の名前","columns":["日付","項目","金額"],"rows":[{"cells":["11/20","電気代","8,400円"]}]}
+{"format":"NSNS-JSON","v":1,"type":"data","ref":"${ref}","title":"表の名前","columns":["日付","項目","金額"],"rows":[{"cells":["11/20","電気代","8,400円"]}]}
 - 列は3〜7個。1行が1件。書かれていない値は ""。
 
 ## 3：資料化
-{"nsns":1,"type":"digest","ref":"${ref}","title":"20字以内","lines":["■ 結論・決めたこと","・…","■ 残っている疑問","・…","■ 次にやること","・…"],"archive":[]}
+{"format":"NSNS-JSON","v":1,"type":"digest","ref":"${ref}","title":"20字以内","lines":["■ 結論・決めたこと","・…","■ 残っている疑問","・…","■ 次にやること","・…"],"archive":[]}
 - 1行を配列の1要素にする。
 
 # 思考法カタログ
@@ -2193,17 +2193,25 @@ function aiCopy(rec,text){
   aiPutRec(rec);
   copyText(text,true).then(ok=>{if(!ok)return;
     toast(`${rec.label}のプロンプトをコピーしました（${rec.n}）。自分のAIに貼ってください`,'取り込む',()=>importSheet(rec.id));
-    hintOnce('aiPend','AIの答え（JSON）は、画面上の「🤖 結果待ち」から取り込めます')});
+    hintOnce('aiPend','AIの答え（JSON）をコピーすると、画面下に取り込みの帯が出ます。＋メニューの「AIの答えを取り込む」からも取り込めます')});
 }
 /* 結果待ちの札：ホームとトークの上に出す */
 function aiPendHTML(){return ''}
+/* クリップボードに「NSNS-JSON」の印があるときだけ、取り込みの帯を出す（旧形式 "nsns":1 も認める） */
+const isNsnsJSON=t=>{t=String(t||'');return /"format"\s*:\s*"NSNS-JSON"/.test(t)||(/"nsns"\s*:\s*1\b/.test(t)&&/"type"\s*:/.test(t))};
+S.clipJSON=false;
+async function aiPasteImport(){const r=aiRecs().filter(x=>!x.quiet)[0]||aiRecs()[0];if(!r){toast('取り込み待ちはありません');return}
+  let t='';try{t=await navigator.clipboard.readText()}catch(err){}importSheet(r.id,t)}
+async function clipCheck(){const on=S.clipJSON;let hit=false;
+  try{if(aiRecs().some(r=>!r.quiet)&&navigator.clipboard&&navigator.clipboard.readText&&navigator.permissions){
+    const st=await navigator.permissions.query({name:'clipboard-read'});if(st.state==='granted')hit=isNsnsJSON(await navigator.clipboard.readText())}}catch(e){}
+  S.clipJSON=hit;if(hit!==on)aiPendRefresh()}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)clipCheck()});
 function aiPendRefresh(){let b=$('#pastebar');const a=aiRecs().filter(r=>!r.quiet);
-  if(!a.length){if(b)b.remove();return}
+  if(!a.length||!S.clipJSON){if(b)b.remove();return}
   if(!b){b=document.createElement('div');b.id='pastebar';document.body.appendChild(b);
-    b.addEventListener('click',async e=>{const r=aiRecs()[0];if(!r)return;
-      if(e.target.closest('[data-pb=paste]')){let t='';try{t=await navigator.clipboard.readText()}catch(err){}importSheet(r.id,t)}
-      else aiPendSheet()})}
-  const r=a[0];b.innerHTML=`<span class="t">🤖 ${esc(r.label)}の答えを待っています${a.length>1?`<small>ほか${a.length-1}件</small>`:''}</span><button data-pb="paste">貼って取り込む</button>`}
+    b.addEventListener('click',e=>{if(e.target.closest('[data-pb=paste]'))aiPasteImport();else aiPendSheet()})}
+  const r=a[0];b.innerHTML=`<span class="t">🤖 AIの答え（NSNS-JSON）がコピーされています<small>${esc(r.label)}${a.length>1?` ほか${a.length-1}件`:''}</small></span><button data-pb="paste">貼って取り込む</button>`}
 function aiPendSheet(){const a=aiRecs();if(!a.length)return;
   const sh=openSheet(`<h3>🤖 AIの結果待ち</h3><p class="hint" style="margin:-6px 2px 12px">プロンプトをAIに貼って、返ってきたJSONを取り込みます。</p>
     <div class="aplist">${a.map(r=>`<div class="ap"><div class="t"><b>${esc(r.label)}</b>　${esc(r.n||'')}<small>${fmtTime(r.at)}にコピー${r.type==='consult'?` · 何回でも取り込めます${r.got?`（${r.got}回済み）`:''}`:''}${(r.type==='classify'||r.type==='split')&&r.total>CHUNK?` · ${r.done}/${r.total}件済み`:''}</small></div>
@@ -2252,7 +2260,7 @@ ${per?`- トークごとに priority（高／中／低）と、その理由を�
 - 省略せず、全部出力してください。「以下同様」などで省かない。
 
 # 出力形式
-{"nsns":1,"type":"think","ref":"${X.ref}","level":${level},"overall":[{"method":"M3","why":"…"}],"rooms":[${per?'{"id":"r1","priority":"高","why":"…","recommend":[{"method":"M1","why":"…"}],"custom":[{"name":"…","questions":["…","…"]}]}':''}]}
+{"format":"NSNS-JSON","v":1,"type":"think","ref":"${X.ref}","level":${level},"overall":[{"method":"M3","why":"…"}],"rooms":[${per?'{"id":"r1","priority":"高","why":"…","recommend":[{"method":"M1","why":"…"}],"custom":[{"name":"…","questions":["…","…"]}]}':''}]}
 - id は各トークの見出しの「id:」の後ろ（r1, r2 …）をそのまま使う。ref もそのまま。
 
 # 思考法カタログ
@@ -3347,7 +3355,7 @@ const ACT={
   toggleSearch:()=>{S.searchOpen=!S.searchOpen;if(!S.searchOpen)S.search='';renderList();$('#q')?.focus()},
   settings,backup,refresh:()=>appRefresh(),
   snoozeBackup:()=>{LS.set('backupSnooze',now()+3*86400000);fillListBody()},
-  newMenu:()=>menuSheet('',[{icon:'💬',label:'新しいトーク',fn:()=>newNode('room')},{icon:'📁',label:'新しいフォルダ',fn:()=>newNode('folder')},{icon:'☑',label:'まとめて選択',sub:'トーク・フォルダを選んで書き出し・移動・まとめる',fn:()=>ACT.lselStart()},{icon:'🧾',label:'AIの会話をメモにする',sub:'ルールだけコピー → AIに貼って整えてもらう → 答えを取り込む',fn:()=>copyRules()}]),
+  newMenu:()=>menuSheet('',[{icon:'💬',label:'新しいトーク',fn:()=>newNode('room')},{icon:'📁',label:'新しいフォルダ',fn:()=>newNode('folder')},{icon:'☑',label:'まとめて選択',sub:'トーク・フォルダを選んで書き出し・移動・まとめる',fn:()=>ACT.lselStart()},{icon:'🧾',label:'AIの会話をメモにする',sub:'ルールだけコピー → AIに貼って整えてもらう → 答えを取り込む',fn:()=>copyRules()},aiRecs().some(r=>!r.quiet)?{icon:'📥',label:'AIの答えを取り込む',sub:'コピーした答え（JSON）を貼って取り込む／結果待ちの一覧',fn:()=>aiPendSheet()}:null]),
   listView:()=>listView(),
   toggleArch:()=>{S.showArch=!S.showArch;fillListBody()},
   selClassify:()=>classifySheet(selList(),()=>selExit()),
@@ -3887,7 +3895,7 @@ function verWatch(){
   await purgeTrash(x=>x.deletedAt<now()-90*86400000);
   await normalizeOrders();
   await loadPhotos();
-  renderList();renderRoom();aiPendRefresh();verWatch();
+  renderList();renderRoom();aiPendRefresh();clipCheck();verWatch();
   SYNC.start();
   if (!document.activeElement || !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) window.scrollTo(0,0);
 })();
