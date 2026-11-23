@@ -53,6 +53,9 @@ body.in-room #roomPane{display:flex}
 
 /* top bar */
 .top{display:flex;align-items:center;gap:4px;padding:calc(10px + var(--safe-t)) 12px 10px;min-height:60px;flex:none}
+.brand{cursor:pointer;-webkit-tap-highlight-color:transparent}
+html,body,button{touch-action:manipulation}
+@media (pointer:coarse){input,textarea,select{font-size:16px!important}}
 .brand{font-weight:700;font-size:20px;letter-spacing:.06em;flex:1;display:flex;align-items:baseline;gap:8px;padding-left:4px}
 .brand small{font-size:11px;color:var(--sub);font-weight:500;letter-spacing:.08em}
 .icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;color:var(--ink);flex:none;transition:background .15s}
@@ -667,6 +670,18 @@ function autoFocus(el,select){
   setTimeout(()=>{el.focus();if(select)el.select()},60);
 }
 /* 保険：フォーカス済みなのにキーボードが出ていない入力欄をタップしたら、いったん外して当て直す */
+document.addEventListener('gesturestart',e=>e.preventDefault());
+function goBack(){
+  if(sheetStack.length){closeSheet();return true}
+  if(S.tab==='data'&&S.dv&&S.dv.mode!=='home'){dvAct({dataset:{d:'back'}},null);return true}
+  if(S.roomId&&document.body.classList.contains('in-room')){closeRoom();return true}
+  if(S.tab==='memo'&&!S.roomId&&S.cwd){ACT.up();return true}
+  return false}
+{let sx=0,sy=0,st=0,on=false;
+ document.addEventListener('touchstart',e=>{const t=e.touches[0];on=e.touches.length===1&&t.clientX<=24&&!e.target.closest('input,textarea');sx=t.clientX;sy=t.clientY;st=Date.now()},{passive:true});
+ document.addEventListener('touchend',e=>{if(!on)return;on=false;const t=e.changedTouches[0];const dx=t.clientX-sx,dy=Math.abs(t.clientY-sy);
+   if(dx>70&&dy<60&&Date.now()-st<700)goBack()},{passive:true});
+ document.addEventListener('touchcancel',()=>{on=false},{passive:true})}
 document.addEventListener('touchend',e=>{
   const t=e.target;if(!t||!t.matches||!t.matches('input:not([type=file]):not([type=date]):not([type=datetime-local]),textarea'))return;
   if(document.activeElement!==t)return;
@@ -836,7 +851,7 @@ function renderList(){
       <button class="icon" data-act="exportHere" title="書き出す">${ICONS.out}</button>
       <button class="icon" data-act="nodeMenu" data-id="${cwd.id}" title="メニュー">${ICONS.more}</button></div>`;
   }else{
-    head=`<div class="top"><div class="brand">NSNS <small>Not SNS</small></div>
+    head=`<div class="top"><div class="brand" data-act="refresh" title="タップで最新版に更新">NSNS <small>Not SNS</small></div>
       <button class="icon" data-act="toggleSearch" title="検索">${ICONS.search}</button>
       <button class="icon" data-act="exportHere" title="書き出す">${ICONS.out}</button>
       <button class="icon" data-act="settings" title="設定">${ICONS.gear}</button></div>`;
@@ -1654,7 +1669,7 @@ function settings(){
   const rooms=[...S.nodes.values()].filter(n=>n.type==='room').length;const last=LS.get('lastBackup',0);
   const sh=openSheet(`<h3>NSNS</h3>
     <div class="note" style="margin-bottom:12px">トーク ${rooms}・メモ ${S.msgs.size}・画像 ${[...S.msgs.values()].reduce((a,m)=>a+(m.images||[]).length,0)}<br>
-    最後のバックアップ：<b>${last?ago(last):'まだありません'}</b><br>
+    最後のバックアップ：<b>${last?ago(last):'まだありません'}</b><br>版：${verTag()}（上の「NSNS」をタップすると最新版に更新）<br>
     ${SYNC.sess?'☁ クラウド同期中です。':'データはこのブラウザの中だけに保存されています。HTMLファイル版とClaude上のプレビュー版は保存場所が別なので、中身は共有されません。'}</div>
     <div class="menu">
       <button data-m="sync"><span class="ic">☁️</span><span>クラウド同期<span class="sub">${SYNC.sess?'ログイン中':'PCとスマホでメモをそろえる'}</span></span></button>
@@ -3239,7 +3254,7 @@ const ACT={
   up:()=>{const c=S.nodes.get(S.cwd);S.cwd=c?.parentId||null;renderList()},
   goto:(el,e)=>{e.stopPropagation();S.cwd=el.dataset.id||null;renderList()},
   toggleSearch:()=>{S.searchOpen=!S.searchOpen;if(!S.searchOpen)S.search='';renderList();$('#q')?.focus()},
-  settings,backup,
+  settings,backup,refresh:()=>appRefresh(),
   snoozeBackup:()=>{LS.set('backupSnooze',now()+3*86400000);fillListBody()},
   newMenu:()=>menuSheet('',[{icon:'💬',label:'新しいトーク',fn:()=>newNode('room')},{icon:'📁',label:'新しいフォルダ',fn:()=>newNode('folder')},{icon:'☑',label:'まとめて選択',sub:'トーク・フォルダを選んで書き出し・移動・まとめる',fn:()=>ACT.lselStart()},{icon:'🧾',label:'AIの会話をメモにする',sub:'ルールだけコピー → AIに貼って整えてもらう → 答えを取り込む',fn:()=>copyRules()}]),
   listView:()=>listView(),
@@ -3749,13 +3764,23 @@ async function syncSheet(){
 /* 新しい版の知らせ：開いている間に本番が更新されたら「更新」を出す（押すまで何も変えない） */
 function verHash(t){let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return t.length+':'+h}
 const verScripts=root=>verHash([...root.querySelectorAll('script:not([src])')].map(x=>x.textContent).join('\n'));
+const verTag=()=>Math.abs(parseInt(verScripts(document).split(':')[1])||0).toString(36).slice(0,5);
+async function appReload(){try{for(const k of await caches.keys())if(k.startsWith('nsns-shell-'))await caches.delete(k);
+    const rs=(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations)?await navigator.serviceWorker.getRegistrations():[];await Promise.all(rs.map(r=>r.update().catch(()=>0)))}catch(e){}
+  location.reload()}
+async function appRefresh(){
+  toast('最新版を確認しています…');let same;
+  try{same=(await verFetch())===verScripts(document)}catch(e){toast('確認できませんでした（オフラインかもしれません）');return}
+  if(same){toast(`すでに最新です（版 ${verTag()}）`,'それでも再読み込み',appReload);return}
+  if([...document.querySelectorAll('textarea')].some(t=>t.value.trim())&&!await confirmSheet('書きかけがあります','更新すると、入力欄の書きかけは消えます。保存済みのメモは消えません。','更新する'))return;
+  appReload()}
 async function verFetch(){const r=await fetch('/index.html?_v='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;return verScripts(new DOMParser().parseFromString(await r.text(),'text/html'))}
 function verWatch(){
   if(!/^https?:$/.test(location.protocol)||location.protocol==='file:')return;
   let base=verScripts(document),shown=false,last=0;
   const show=()=>{if(shown)return;shown=true;const b=document.createElement('div');b.id='verbar';
     b.innerHTML='<span>新しい版があります</span><button>更新</button><button class="x" aria-label="閉じる">×</button>';
-    b.querySelector('button').onclick=()=>location.reload();b.querySelector('.x').onclick=()=>b.remove();document.body.appendChild(b)};
+    b.querySelector('button').onclick=appReload;b.querySelector('.x').onclick=()=>b.remove();document.body.appendChild(b)};
   const check=async()=>{if(shown||document.hidden||!navigator.onLine||Date.now()-last<20000)return;last=Date.now();
     try{const h=await verFetch();if(h!==base)show()}catch(e){}};
   check();
