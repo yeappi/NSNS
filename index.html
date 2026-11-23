@@ -2077,9 +2077,15 @@ ${P_FLOW}
 ${msgs?rooms.map(r=>{const ms=msgs.filter(m=>m.roomId===r.id);return `## トーク「${r.name}」 id:${X.rr(r)}（選んだ${ms.length}件）\n`+ms.map(m=>'私: '+flat(m.text)).join('\n')}).join('\n\n'):rooms.map(r=>roomForAI(r,X)).join('\n\n')}
 `,
 };
-const folderNamesForAI=()=>{const a=[...S.nodes.values()].filter(n=>n.type==='folder'&&!n.archived).map(n=>n.name).slice(0,30);return a.length?a.join(' / '):'（まだありません）'};
+function treeForAI(rec){const root=S.cwd&&S.nodes.has(S.cwd)?S.cwd:null;let nf=0,nr=0,left=0;const lines=[];
+  const walk=(pid,d)=>{for(const k of sortNodes(kids(pid))){if(k.archived||k.docs||k.inbox||k.ibArch)continue;
+    if(lines.length>=60){left++;if(k.type==='folder')left+=descendants(k.id).filter(x=>x.type==='room'&&!x.docs).length;continue}
+    const id=(k.type==='folder'?'f':'r')+(k.type==='folder'?++nf:++nr);rec.refs[id]=k.id;lines.push('  '.repeat(d)+`${id} ${k.name}`);
+    if(k.type==='folder')walk(k.id,d+1)}};
+  walk(root,0);if(left)lines.push(`…ほか${left}個（省略）`);
+  return `取り込み先：${root?`「${S.nodes.get(root).name}」の中`:'ホーム'}（in を付けなければ、ここに新しく作ります）\n${lines.length?lines.join('\n'):'（まだ何もありません）'}`}
 const mCatalogShort=()=>MC.map(c=>`${c.id} ${c.n}｜${M_MEAN[c.id]||''}｜向く場面：${c.sc}｜${c.ty==='rep'||c.rm==='one'?'1トーク':c.rm==='frames'?`${c.frames.length}トークに広がる`:'対象ごとのトーク＋比べるトーク'}`).join('\n');
-const RULES_PROMPT=ref=>`あなたは、メモアプリ「NSNS」に入れる形に、私の考えや会話を整えるアシスタントです。この下に続く私との会話（またはこのあとに私が書く内容）が材料です。何をどう整えるかは、会話しながら一緒に決めます。
+const RULES_PROMPT=(ref,rec)=>`あなたは、メモアプリ「NSNS」に入れる形に、私の考えや会話を整えるアシスタントです。この下に続く私との会話（またはこのあとに私が書く内容）が材料です。何をどう整えるかは、会話しながら一緒に決めます。
 
 # NSNSの考え方
 - 土台は「メモ」です。会話の中身は、必ず原文に近いメモとして残します。その上に、必要なときだけ「問い」を足します。問いは、トークを開くと1つずつ出て、私が答えを書き込みます。
@@ -2101,7 +2107,9 @@ const RULES_PROMPT=ref=>`あなたは、メモアプリ「NSNS」に入れる形
 
 # 参考（いまのNSNS）
 - タグ: ${tagListForAI()}（まず既存から選ぶ。合うものがないときだけ新しく作る）
-- フォルダ: ${folderNamesForAI()}
+- 既存の構造（f＝フォルダ、r＝トーク。番号で指定できる）:
+${treeForAI(rec)}
+- 同じ内容のトークやフォルダが既にあるときは、新しく作らず、既存に追記してください（下の in / into）。
 
 # できること
 ## 1. メモにする（必ず最初に決める）
@@ -2123,6 +2131,12 @@ const RULES_PROMPT=ref=>`あなたは、メモアプリ「NSNS」に入れる形
 - kind（1件に1つ）: ${KINDS.map(k=>`${k.id}＝${k.label}（${k.desc}）`).join(' ／ ')} ／ null＝迷うとき
 - st: draft＝未確定・未着手 ／ fixed＝決めたこと ／ done＝終わったこと ／ null＝状態なし。task は draft か done だけ。
 - tags は0〜3個。迷うときは付けない。
+
+## 既存に足す（上の「既存の構造」の番号を使う）
+- 既存のトークに、メモや問いを足す：{"into":"r3","memos":[…],"questions":[…]}（title は不要）
+- 既存のフォルダの中に、新しいトークやフォルダを作る：最上位の項目に "in":"f2" を付ける（例：{"in":"f2","title":"新しいトーク","memos":[…]}）
+- in と into は、同じ項目に両方付けないでください。番号は「既存の構造」にあるものだけを使い、作り出さないでください。
+- 同じJSONの中で新しく作るフォルダやトークには、番号は付きません。入れ子で書いてください。
 
 ## 3：データ化
 {"nsns":1,"type":"data","ref":"${ref}","title":"表の名前","columns":["日付","項目","金額"],"rows":[{"cells":["11/20","電気代","8,400円"]}]}
@@ -2172,7 +2186,7 @@ function aiSendNext(rec){
   rec.n=`メモ${take.length}件${part}`;
   aiCopy(rec,PROMPTS[rec.type]({msgs:take,lv:rec.lv},aiX(rec)));
 }
-function copyRules(){const rec={id:rid4(),type:'consult',at:now(),refs:{},label:'ルールだけ',n:'メモなし'};rec.place=aiPlace([]);rec.folderId=rec.place||'';aiCopy(rec,RULES_PROMPT(rec.id))}
+function copyRules(){const rec={id:rid4(),type:'consult',at:now(),refs:{},label:'ルールだけ',n:'メモなし'};rec.place=aiPlace([]);rec.folderId=rec.place||'';aiCopy(rec,RULES_PROMPT(rec.id,rec))}
 function aiCopy(rec,text){
   if(rec.type!=='classify'&&rec.type!=='split'&&text.length<300000)rec.text=text;
   aiPutRec(rec);
@@ -2460,75 +2474,99 @@ function planData(j,rec){
       return {nodes,roots:nodes,msgs:[m.id],open:docs.id}}};
 }
 function planMemos(j,rec){
-  const mapT=tagMapper();const RL=[];let nF=0;
+  const mapT=tagMapper();const RL=[];let miss=0;
   const tt=(x,n)=>String(x||'').trim().slice(0,n);
+  const byRef=id=>{id=String(id??'').trim();return S.nodes.get(rec&&rec.refs&&rec.refs[id]?rec.refs[id]:id)};
+  const exFolder=id=>{const n=byRef(id);return n&&n.type==='folder'&&!n.archived?n:null};
+  const exRoom=id=>{const n=byRef(id);return n&&n.type==='room'?n:null};
   const memoOf=x=>{x=typeof x==='string'?{text:x}:x;if(!x||!String(x.text||'').trim())return null;
     let kind=isNull(x.kind)?null:String(x.kind).trim();if(kind&&!KIND[kind]){const w=kindWord(kind.toLowerCase());kind=w===undefined?null:w}
     let st=isNull(x.st)?null:String(x.st).trim();if(st&&!STL[st])st={'未確定':'draft','確定':'fixed','完了':'done'}[st]||null;
     if(kind==='task'&&st==='fixed')st='draft';
     return {text:String(x.text).trim(),kind,st,tags:[...new Set((Array.isArray(x.tags)?x.tags:[]).map(mapT).filter(Boolean))].slice(0,5)}};
-  const mkRoom_=(r,path)=>{const title=tt(r?.title||r?.name,60);const c=MCB.get(tt(r?.method,8));
+  const mkRoom_=(r,top)=>{
+    const hasIn=r&&!isNull(r.in),hasInto=r&&!isNull(r.into);
+    if(hasIn&&hasInto)throw new Error(`「in」と「into」は同じ項目に付けられません（${tt(r.title||r.into,30)}）。新しいトークを既存フォルダに作るなら in、既存のトークに足すなら into のどちらか1つです`);
+    const title=tt(r?.title||r?.name,60);const c=MCB.get(tt(r?.method,8));
     const qs=(Array.isArray(r?.questions)?r.questions:[]).map(x=>String(x).trim()).filter(Boolean);
     const memos=(Array.isArray(r?.memos)?r.memos:[]).map(memoOf).filter(Boolean);
     const method=c?{m:c.id,why:tt(r.why,40)}:null;
+    if(hasInto){const n=exRoom(r.into);if(!n){miss++;return null}
+      const room={k:'r',title:n.name,exist:n,memos,qs:qs.length?qs:null,std:null,mid:null,method:null};
+      if(!qs.length&&c&&c.rm==='one'){room.mid=c.id}
+      if(!memos.length&&!room.qs&&!room.mid)return null;return room}
+    let inParent;if(hasIn){if(!top)throw new Error(`「in」は最上位の項目にだけ使えます（${title}）`);const f=exFolder(r.in);if(!f){miss++;return null}inParent=f.id}
     // 思考法だけ指定：標準の問いを使う（枠・対象ごとのものはフォルダ＋トークに広げる）
     if(c&&!qs.length&&c.rm!=='one'){const T=title||c.n;const rooms=[];
       if(c.rm==='frames')c.frames.forEach(([lb,q])=>rooms.push({k:'r',title:`${c.n}｜${lb}`,memos:[],std:[q],mm:c.id,method:null,path:[]}));
       else{const tg=(Array.isArray(r.targets)?r.targets:[]).map(x=>tt(x,30)).filter(Boolean);(tg.length?tg:c.targets).forEach(lb=>rooms.push({k:'r',title:`${c.n}｜${lb}`,memos:[],std:[...c.q],mm:c.id,method:null,path:[]}));
         if(c.final)rooms.push({k:'r',title:`${c.n}｜比べる`,memos:[],std:[...c.final],mm:c.id,method:null,path:[]})}
       if(memos.length)rooms.unshift({k:'r',title:'元の考え',memos,std:null,method:null,path:[]});
-      return {k:'f',title:T,ch:rooms,method}}
-    const room={k:'r',title:title||(c&&c.n)||'',memos,qs:null,std:null,method};
-    if(qs.length)room.qs=qs;else if(c)room.mid=c.id;else if(!memos.length&&title)room.qs=[title]; // 問いだけのトーク：トーク名が最初の問い
+      return {k:'f',title:T,ch:rooms,method,inParent}}
+    const room={k:'r',title:title||(c&&c.n)||'',memos,qs:null,std:null,method,inParent};
+    if(qs.length)room.qs=qs;else if(c)room.mid=c.id;else if(!memos.length&&title)room.qs=[title];
     if(!room.title)room.title=memos.length?'AIと整理':'問い';
     if(!memos.length&&!room.qs&&!room.mid)return null;return room};
   const walk=(a,depth)=>{const out=[];
-    for(const f of (Array.isArray(a.folders)?a.folders:[])){if(depth>=4||!f)continue;const ch=walk(f,depth+1);if(ch.length)out.push({k:'f',title:tt(f.title||f.name,40)||'フォルダ',ch})}
-    for(const r of (Array.isArray(a.rooms)?a.rooms:[])){const n=mkRoom_(r,[]);if(n)out.push(n)}
+    for(const f of (Array.isArray(a.folders)?a.folders:[])){if(depth>=4||!f)continue;
+      const hasIn=!isNull(f.in);if(hasIn&&!isNull(f.into))throw new Error(`「in」と「into」は同じ項目に付けられません（${tt(f.title,30)}）`);
+      let inParent;if(hasIn){if(depth>0)throw new Error(`「in」は最上位の項目にだけ使えます（${tt(f.title,30)}）`);const x=exFolder(f.in);if(!x){miss++;continue}inParent=x.id}
+      const ch=walk(f,depth+1);if(ch.length)out.push({k:'f',title:tt(f.title||f.name,40)||'フォルダ',ch,inParent})}
+    for(const r of (Array.isArray(a.rooms)?a.rooms:[])){const n=mkRoom_(r,depth===0);if(n)out.push(n)}
     return out};
   const top=Object.assign({},j);
   if(j.folder&&!Array.isArray(j.folders)){const t=typeof j.folder==='object'?(j.folder.title||j.folder.name):j.folder;top.folders=[{title:t,rooms:j.rooms}];top.rooms=[]}
   const tree=walk(top,0);
-  // 平らな一覧（確認画面の項目）
   const items=[];const reg=(n,path)=>{if(n.k==='f'){n.ch.forEach(c=>reg(c,[...path,n.title]));return}
-    n.ri=RL.length;RL.push(n);n.path=path;n.memos.forEach(m=>items.push({ri:n.ri,m}));if(n.qs||n.std||n.mid)items.push({ri:n.ri,q:true})};
+    n.ri=RL.length;RL.push(n);n.path=n.exist?[]:path;n.memos.forEach(m=>items.push({ri:n.ri,m}));if(n.qs||n.std||n.mid)items.push({ri:n.ri,q:true})};
   tree.forEach(n=>reg(n,[]));
-  if(!RL.length)throw new Error('メモも問いもありません（folders / rooms が空です）');
+  if(!RL.length)throw new Error(miss?`追記先・置き場所の番号が見つかりません（${miss}件）。ルールだけコピーを押し直して、新しいプロンプトで出してもらってください`:'メモも問いもありません（folders / rooms が空です）');
   if(RL.length>150)throw new Error('トークが多すぎます（150個まで）。大分類ごとに分けて出してもらってください');
   const qOf=r=>r.qs||r.std||(r.mid?mSteps(MCB.get(r.mid)).steps:[]);
   let pid=S.cwd&&S.nodes.has(S.cwd)?S.cwd:null;const where=pid?S.nodes.get(pid).name:'ホーム';
   const d0=new Date();const wname=tt(j.title,40)||`AI整理 ${d0.getMonth()+1}/${d0.getDate()} ${String(d0.getHours()).padStart(2,'0')}:${String(d0.getMinutes()).padStart(2,'0')}`;
-  const single=tree.length===1&&tree[0].k==='f';
+  const newRoots=tree.filter(n=>!n.inParent&&!(n.k==='r'&&n.exist));
+  const single=newRoots.length===1&&newRoots[0].k==='f';
   const nM=items.filter(x=>x.m).length,nQ=items.filter(x=>x.q).length;
   const nFo=(function c(a){return a.reduce((n,x)=>n+(x.k==='f'?1+c(x.ch):0),0)})(tree);
-  const path=r=>r.path.length?`<small style="color:var(--sub)">${r.path.map(esc).join(' › ')} › </small>`:'';
+  const nNew=RL.filter(r=>!r.exist).length,nApp=RL.length-nNew;
+  const crumb=n=>{const a=[];let x=n;while(x){a.unshift(x.name);x=x.parentId?S.nodes.get(x.parentId):null}return a.join(' › ')};
+  const path=r=>r.exist?`<small style="color:var(--accent)">既存に追記 › ${esc(crumb(r.exist))}</small><br>`:(r.path.length?`<small style="color:var(--sub)">${r.path.map(esc).join(' › ')} › </small>`:'');
+  const inNote=tree.filter(n=>n.inParent).length;
   return {count:items.length,
-    pick:items.map(x=>{const r=RL[x.ri];return x.q?{on:true,html:`${path(r)}<b>${esc(r.title)}</b>　❓${r.mid&&!r.qs?`標準の問い（${esc(MCB.get(r.mid).n)}）`:'問い'}${qOf(r).length}件<br><small>${qOf(r).slice(0,3).map(esc).join(' / ')}${qOf(r).length>3?' …':''}</small>`}
-      :{on:true,html:`${path(r)}<b>${esc(r.title)}</b>　${x.m.kind?kindText(x.m.kind):'<span style="color:var(--sub)">未分類</span>'}${x.m.st?` <span class="sc ${x.m.st}">${stLabel(x.m,x.m.st)}</span>`:''}${x.m.tags.length?` <span class="at">${x.m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`:''}<br><small>${esc(flat(x.m.text).slice(0,60))}</small>`}}),
-    wrap:{on:!single,name:wname},
-    html:`「${esc(where)}」に、${nFo?`フォルダ <b>${nFo}</b>個と、`:''}トーク <b>${RL.length}</b>個を作ります（メモ${nM}件${nQ?`・問い付き${nQ}個`:''}）。下でチェックしたものだけが入ります。`,
-    apply:async(iid,picked,opt)=>{const t=now();const nodes=[],msgs=[];
+    wrap:newRoots.length?{on:!single,name:wname}:null,
+    pick:items.map(x=>{const r=RL[x.ri];return x.q?{on:true,html:`${path(r)}<b>${r.exist?'':esc(r.title)}</b>　❓${r.mid&&!r.qs?`標準の問い（${esc(MCB.get(r.mid).n)}）`:'問い'}${qOf(r).length}件<br><small>${qOf(r).slice(0,3).map(esc).join(' / ')}${qOf(r).length>3?' …':''}</small>`}
+      :{on:true,html:`${path(r)}<b>${r.exist?'':esc(r.title)}</b>　${x.m.kind?kindText(x.m.kind):'<span style="color:var(--sub)">未分類</span>'}${x.m.st?` <span class="sc ${x.m.st}">${stLabel(x.m,x.m.st)}</span>`:''}${x.m.tags.length?` <span class="at">${x.m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`:''}<br><small>${esc(flat(x.m.text).slice(0,60))}</small>`}}),
+    html:`${nNew?`「${esc(where)}」に、${nFo?`フォルダ <b>${nFo}</b>個と、`:''}トーク <b>${nNew}</b>個を作ります。`:''}${nApp?`<br>既存のトーク <b>${nApp}</b>個に追記します。`:''}${inNote?`<br>既存のフォルダの中に作るもの：${inNote}件`:''}（メモ${nM}件${nQ?`・問い${nQ}件`:''}）下でチェックしたものだけが入ります。${miss?`<br><span class="warn">見つからない番号：${miss}件（スキップ）</span>`:''}`,
+    apply:async(iid,picked,opt)=>{const t=now();const nodes=[],msgs=[],edit=[],prevRun={};
       const use=new Map();items.forEach((x,i)=>{if(picked&&!picked[i])return;const u=use.get(x.ri)||{m:[],q:false};x.m?u.m.push(x.m):u.q=true;use.set(x.ri,u)});
       if(!use.size)return {nodes:[],roots:[],msgs:[]};
       let ci=0;
-      const build=(list,parent,top)=>{const made=[];
-        const ready=list.filter(function ok(n){return n.k==='f'?n.ch.some(ok):use.has(n.ri)});
+      const addMemos=(roomId,list)=>list.forEach((m,k)=>{const o={id:uid(),roomId,text:m.text,images:[],createdAt:t+k,exportedAt:null,exportId:null,importId:iid,tags:m.tags};
+        if(m.kind){o.kind=m.kind;o.kindBy='ai'}if(m.st)o.st=m.st;msgs.push(o)});
+      const ok=n=>n.k==='f'?n.ch.some(ok):use.has(n.ri);
+      const build=(list,parent,top)=>{const made=[];const ready=list.filter(ok);
         ready.forEach((n,i)=>{const order=top?nextTopOrder(parent)-(ready.length-1)+i:i;
           if(n.k==='f'){const fo={id:uid(),type:'folder',parentId:parent,name:n.title,emoji:'',color:PALETTE[(ci++)%7],tags:[],order,createdAt:t,importId:iid};nodes.push(fo);build(n.ch,fo.id,false);made.push(fo.id);return}
           const u=use.get(n.ri);
+          if(n.exist){const ex=S.nodes.get(n.exist.id);if(!ex)return;
+            if(u.q){const add=qOf(n);if(add.length){prevRun[ex.id]=ex.mrun?JSON.parse(JSON.stringify(ex.mrun)):null;
+              let rest=[];if(ex.mrun){const c=MCB.get(ex.mrun.mid);const st=ex.mrun.steps||(c?mSteps(c).steps:[]);rest=st.slice(ex.mrun.pos||0)}
+              ex.mrun={mid:'AI',pos:0,steps:[...rest,...add]};ex.qroom=true;S.qa.delete(ex.id)}}
+            ex.lastAt=t;edit.push(ex);addMemos(ex.id,u.m);return}
           const ro={id:uid(),type:'room',parentId:parent,name:n.title,emoji:'',color:PALETTE[(ci++)%7],tags:[],badge:true,order,createdAt:t,lastAt:t,importId:iid};
           if(u.q){if(n.mid&&!n.qs)ro.mrun={mid:n.mid,pos:0};else ro.mrun={mid:n.mm||(n.method?n.method.m:'AI'),pos:0,steps:qOf(n)};ro.qroom=true}
           if(n.method)ro.rec=[n.method];
-          nodes.push(ro);made.push(ro.id);
-          u.m.forEach((m,k)=>{const o={id:uid(),roomId:ro.id,text:m.text,images:[],createdAt:t+k,exportedAt:null,exportId:null,importId:iid,tags:m.tags};
-            if(m.kind){o.kind=m.kind;o.kindBy='ai'}if(m.st)o.st=m.st;msgs.push(o)})});
+          nodes.push(ro);made.push(ro.id);addMemos(ro.id,u.m)});
         return made};
-      let roots;
-      if(opt&&opt.wrap){const w={id:uid(),type:'folder',parentId:pid,name:(opt.name||wname).slice(0,40),emoji:'🗂',color:PALETTE[ci++%7],tags:[],order:nextTopOrder(pid),createdAt:t,importId:iid};nodes.push(w);build(tree,w.id,false);roots=[w.id]}
-      else roots=build(tree,pid,true);
-      await saveNodes(nodes);if(msgs.length)await saveMsgs(msgs);if(rec&&rec.type!=='consult')aiDropRec(rec.id);
-      const first=nodes.find(n=>n.type==='room');
-      return {nodes:nodes.map(n=>n.id),roots,msgs:msgs.map(m=>m.id),open:roots.length===1?roots[0]:null}}};
+      const fresh=tree.filter(n=>!n.inParent&&!(n.k==='r'&&n.exist)),inRoots=tree.filter(n=>n.inParent),apps=tree.filter(n=>n.k==='r'&&n.exist);
+      let roots=[];
+      if(opt&&opt.wrap&&fresh.some(ok)){const w={id:uid(),type:'folder',parentId:pid,name:(opt.name||wname).slice(0,40),emoji:'🗂',color:PALETTE[ci++%7],tags:[],order:nextTopOrder(pid),createdAt:t,importId:iid};nodes.push(w);build(fresh,w.id,false);roots.push(w.id)}
+      else roots=roots.concat(build(fresh,pid,true));
+      inRoots.forEach(n=>{roots=roots.concat(build([n],n.inParent,true))});
+      build(apps,null,false);
+      await saveNodes([...nodes,...edit]);if(msgs.length)await saveMsgs(msgs);if(rec&&rec.type!=='consult')aiDropRec(rec.id);
+      return {nodes:nodes.map(n=>n.id),roots,msgs:msgs.map(m=>m.id),prevRun:Object.keys(prevRun).length?prevRun:undefined,open:roots.length===1&&!edit.length?roots[0]:null}}};
 }
 function makePlan(j,rec){
   switch(j.type){
