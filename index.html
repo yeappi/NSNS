@@ -459,8 +459,9 @@ details.adv .in{padding:0 14px 14px}
 .fv{font-size:12px;margin-right:3px}
 .dvh{font-size:12px;font-weight:700;color:var(--sub);margin:14px 4px 6px}
 .dvrow{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:14px;padding:11px 12px;margin-bottom:6px;box-shadow:var(--shadow);cursor:pointer}
-.dvrow .ic{font-size:20px;flex:none}.dvrow .t{flex:1;min-width:0;font-size:15px}.dvrow small{display:block;font-size:11.5px;color:var(--sub);margin-top:1px}
+.dvrow .ic{font-size:20px;flex:none}.dvrow .t{flex:1;min-width:0;font-size:15px}.dvrow small{display:block;font-size:11.5px;color:var(--sub);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dvfav,.dvfavb{font-size:20px;color:#C9BFB4}.dvfav.on,.dvfavb.on{color:#E9A93C}
+.dvn{flex:none;font-size:11px;background:var(--accent-soft);color:var(--accent-ink);border-radius:9px;padding:1px 8px;font-weight:500}
 .dvempty{font-size:12.5px;color:var(--sub);padding:6px 6px 10px}
 .dvf{display:flex;flex-direction:column;gap:6px;margin:4px 0 8px}
 .dvgrp{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
@@ -2377,11 +2378,17 @@ function renderData(P){
   const foc=document.activeElement&&document.activeElement.id==='dvta';const dta=$('#dvta');if(dta)D.draft=dta.value;
   if(D.mode==='home'||!D.v){
     const saved=dvSaved(),fav=saved.filter(v=>v.fav);
-    const row=(v,ic)=>`<div class="dvrow" data-act="dv" data-d="open" data-id="${esc(v.id)}"><span class="ic">${ic||(v.gv!=null?'💬':'🗂')}</span><div class="t">${esc(v.name)}<small>${DV_GROUPS.find(x=>x[0]===v.group)?.[1]||''}${v.gv!=null?' › '+esc(dvLabel(v.group,v.gv)):''}</small></div>${v.id.startsWith('p:')?'':`<button class="dvfav${v.fav?' on':''}" data-act="dv" data-d="fav" data-id="${esc(v.id)}">${v.fav?'★':'☆'}</button>`}</div>`;
+    const pv=m=>m?esc(((m.text||'📷 画像').replace(/\n/g,' ')).slice(0,34)):'';
+    const lastOf=(v)=>{const l=dvRoomMsgs(v,v.gv!=null?v.gv:null);return {n:l.length,m:l[l.length-1]}};
+    const row=(v,ic)=>{const isP=v.id.startsWith('p:');const direct=v.gv!=null||v.group==='none';const x=direct?lastOf(v):null;
+      return `<div class="dvrow" data-act="dv" data-d="open" data-id="${esc(v.id)}"><span class="ic">${ic||(v.gv!=null?'💬':'🗂')}</span><div class="t">${esc(v.name)}<small>${x?pv(x.m)||'まだメモがありません':(DV_GROUPS.find(g=>g[0]===v.group)?.[1]||'')+(v.gv!=null?' › '+esc(dvLabel(v.group,v.gv)):'')}</small></div>${x?`<span class="dvn">${x.n}</span>`:''}${isP?'':`<button class="dvfav${v.fav?' on':''}" data-act="dv" data-d="fav" data-id="${esc(v.id)}">${v.fav?'★':'☆'}</button>`}</div>`};
+    const kv=DV_PRESETS.find(x=>x.id==='p:kind');const kg=dvGroups(kv);
+    const krow=g=>{const l=dvRoomMsgs(kv,g.k);return `<div class="dvrow" data-act="dv" data-d="kroom" data-v="${esc(g.k)}"><span class="ic">💬</span><div class="t">${esc(g.label)}<small>${pv(l[l.length-1])}</small></div><span class="dvn">${g.n}</span></div>`};
     head=`<div class="top"><div class="brand">データ <small>束ねて俯瞰する</small></div><button class="icon" data-act="dv" data-d="search" title="条件を細かく探す">${ICONS.search}</button></div>`;
     body=`${fav.length?`<div class="dvh">⭐ お気に入り</div>${fav.map(v=>row(v)).join('')}`:''}
-      <div class="dvh">はじめから使えるビュー</div>${DV_PRESETS.map(v=>row(v,v.ic)).join('')}
-      <div class="dvh">マイビュー</div>${saved.filter(v=>!v.fav).map(v=>row(v)).join('')||'<div class="dvempty">ビューを開いて「💾 保存」すると、ここに並びます</div>'}`;
+      <div class="dvh">種類別のトークルーム</div>${kg.map(krow).join('')||'<div class="dvempty">メモに種類が付くと、ここに並びます</div>'}
+      <div class="dvh">ほかの見方</div>${DV_PRESETS.filter(v=>v.id!=='p:kind').map(v=>row(v,v.ic)).join('')}
+      ${saved.filter(v=>!v.fav).length?`<div class="dvh">マイビュー</div>${saved.filter(v=>!v.fav).map(v=>row(v)).join('')}`:`<div class="dvh">マイビュー</div><div class="dvempty">ビューを開いて「💾 保存」すると、ここに並びます</div>`}`;
   }else{
     const v=D.v,gv=D.gv;const inRoom=D.mode==='room';
     const saved=v.id&&!v.id.startsWith('p:');
@@ -2431,11 +2438,12 @@ function dvAct(el,e){
   const detach=()=>{if(v&&(!v.id||v.id.startsWith('p:'))&&v.id!==null){D.v=v={id:null,name:v.name,group:v.group,f:v.f}}};
   const touchF=()=>{dvPersist(v);renderList()};
   switch(d){
-    case 'open':{const id=el.dataset.id;const sv=id.startsWith('p:')?DV_PRESETS.find(x=>x.id===id):dvSaved().find(x=>x.id===id);if(!sv)break;
+    case 'open':{D.from=null;const id=el.dataset.id;const sv=id.startsWith('p:')?DV_PRESETS.find(x=>x.id===id):dvSaved().find(x=>x.id===id);if(!sv)break;
       D.v=clone(sv);D.v.f=dvF(D.v.f);if(sv.gv!=null){D.gv=sv.gv;D.mode='room'}else{D.gv=null;D.mode='groups'}
       if(D.v.group==='none'){D.mode='room';D.gv=null}D.draft='';D.showF=false;renderList();break}
+    case 'kroom':{D.v=clone(DV_PRESETS.find(x=>x.id==='p:kind'));D.v.f=dvF(D.v.f);D.gv=el.dataset.v;D.mode='room';D.from='home';D.draft='';D.showF=false;renderList();break}
     case 'room':D.gv=el.dataset.v;D.mode='room';D.draft='';D.showF=false;renderList();break;
-    case 'back':if(D.mode==='room'&&D.v.group!=='none'&&!(D.v.gv!=null)){D.mode='groups';D.gv=null}else{D.mode='home';D.v=null;D.gv=null}renderList();break;
+    case 'back':if(D.from!=='home'&&D.mode==='room'&&D.v.group!=='none'&&!(D.v.gv!=null)){D.mode='groups';D.gv=null}else{D.mode='home';D.v=null;D.gv=null;D.from=null}renderList();break;
     case 'group':if(v){detach();v.group=el.dataset.v;if(v.group==='digest')v.f.docsOnly=true;else if(v.f.docsOnly&&!(v.id&&v.id.startsWith('p:digest')))v.f.docsOnly=false;D.gv=null;D.mode=v.group==='none'?'room':'groups';touchF()}break;
     case 'range':if(v){detach();v.f.range=el.dataset.v;touchF()}break;
     case 'kind':if(v){detach();const x=el.dataset.v;v.f.kinds=v.f.kinds.includes(x)?v.f.kinds.filter(y=>y!==x):[...v.f.kinds,x];touchF()}break;
