@@ -1892,12 +1892,17 @@ const PROMPTS={
 - メモにない事実を足さないでください。推測で埋めないでください。
 - 各メモの先頭の ( ) は書いた日付です。本文ではないので、分解や資料化の本文に含めないでください。
 - メモの id は [ ] の中（m1, m2 …）、トークの id は見出しの「id:」の後ろ（r1, r2 …）をそのまま使ってください。
+- 「既存の構造」の番号（F1・T1 …）は、メモの見出しの id（r1 …）とは別物です。混ぜないでください。
 - 分解を確定したあとは、分けたメモを m2-1, m2-2 …（parts の順）と呼んでください。分けた元の id（m2）はもう使えません。
 - "ref" には必ず "${X.ref}" と入れてください。
 - JSONは省略しないでください。「以下同様」などで省かないでください。
 - 会話が長くなっても、JSONの形は下の見本どおりにしてください。
 
 # できること（返し方）
+
+## メモの組み替え：メモを、フォルダ・トーク・問い・思考法に作り直す
+向く場面：話題ごとにトークを分けたい／フォルダに整理したい／問いや思考法を足して深めたい。元のメモは消えません（新しいメモとして作ります）。
+${MEMOS_FMT(X.ref,'F','T').replace('## 1・2：メモと問い','（形式）').replace('## 既存に足す（上の「既存の構造」の番号を使う）','（既存に足す：下の「既存の構造」の番号 F1・T1 …を使う）')}
 
 ## 分類：各メモに種類・状態・タグを付ける（本文は変えない）
 {"format":"NSNS-JSON","v":1,"type":"classify","ref":"${X.ref}","items":[{"id":"m1","kind":"task","st":"draft","tags":["タグ"]}],"newTags":["新しく作ったタグ"]}
@@ -1941,8 +1946,11 @@ const PROMPTS={
 - 整える：意味は変えずに、誤字や言い回しを直す。
 - まとめる：要点だけを短く書き直す。ただし事実は足さない。
 
-# 思考法カタログ（AI思考法で使う）
+# 思考法カタログ（AI思考法・組み替えの method で使う）
 ${mCatalogForAI()}
+
+# 既存の構造（組み替えの置き場所。F＝フォルダ、T＝トーク）
+${treeForAI(X.rec,'F','T')}
 
 # 既存のタグ（使われている回数）
 ${tagListForAI()}
@@ -2078,14 +2086,30 @@ ${P_FLOW}
 ${msgs?rooms.map(r=>{const ms=msgs.filter(m=>m.roomId===r.id);return `## トーク「${r.name}」 id:${X.rr(r)}（選んだ${ms.length}件）\n`+ms.map(m=>'私: '+flat(m.text)).join('\n')}).join('\n\n'):rooms.map(r=>roomForAI(r,X)).join('\n\n')}
 `,
 };
-function treeForAI(rec){const root=S.cwd&&S.nodes.has(S.cwd)?S.cwd:null;let nf=0,nr=0,left=0;const lines=[];
+function treeForAI(rec,pf='f',pr='r'){const root=S.cwd&&S.nodes.has(S.cwd)?S.cwd:null;let nf=0,nr=0,left=0;const lines=[];
   const walk=(pid,d)=>{for(const k of sortNodes(kids(pid))){if(k.archived||k.docs||k.inbox||k.ibArch)continue;
     if(lines.length>=60){left++;if(k.type==='folder')left+=descendants(k.id).filter(x=>x.type==='room'&&!x.docs).length;continue}
-    const id=(k.type==='folder'?'f':'r')+(k.type==='folder'?++nf:++nr);rec.refs[id]=k.id;lines.push('  '.repeat(d)+`${id} ${k.name}`);
+    const id=(k.type==='folder'?pf:pr)+(k.type==='folder'?++nf:++nr);rec.refs[id]=k.id;lines.push('  '.repeat(d)+`${id} ${k.name}`);
     if(k.type==='folder')walk(k.id,d+1)}};
   walk(root,0);if(left)lines.push(`…ほか${left}個（省略）`);
   return `取り込み先：${root?`「${S.nodes.get(root).name}」の中`:'ホーム'}（in を付けなければ、ここに新しく作ります）\n${lines.length?lines.join('\n'):'（まだ何もありません）'}`}
 const mCatalogShort=()=>MC.map(c=>`${c.id} ${c.n}｜${M_MEAN[c.id]||''}｜向く場面：${c.sc}｜${c.ty==='rep'||c.rm==='one'?'1トーク':c.rm==='frames'?`${c.frames.length}トークに広がる`:'対象ごとのトーク＋比べるトーク'}`).join('\n');
+const MEMOS_FMT=(ref,f,r)=>`## 1・2：メモと問い
+{"format":"NSNS-JSON","v":1,"type":"memos","ref":"${ref}","title":"このまとまりの名前（20字以内）","folders":[{"title":"大分類","folders":[{"title":"テーマ","rooms":[{"title":"元の考え","memos":[{"text":"原文","kind":"idea","st":null,"tags":["タグ"]}]},{"title":"最初の問い（トーク名）"},{"title":"問いを並べるトーク","questions":["最初の問い","次の問い"]},{"title":"思考法のトーク","method":"M5","why":"20字以内の理由"}]}]}],"rooms":[]}
+- folders は入れ子にできます。フォルダが要らないときは、最上位の rooms だけで構いません。
+- rooms の title は60字以内です。memos・questions・method・why は省略できます。メモと問いは、同じトークに両方入れても構いません。
+- memos も questions も method も無いトークは、トーク名が最初の問いになります。method だけなら、標準の問いが入ります。枠型・対象型は "targets":["A案","B案"] で対象を指定できます。
+- kind（1件に1つ）: ${KINDS.map(k=>`${k.id}＝${k.label}（${k.desc}）`).join(' ／ ')} ／ null＝迷うとき
+- st: draft＝未確定・未着手 ／ fixed＝決めたこと ／ done＝終わったこと ／ null＝状態なし。task は draft か done だけ。
+- tags は0〜3個。迷うときは付けない。
+
+## 既存に足す（上の「既存の構造」の番号を使う）
+- 既存のトークに、メモや問いを足す：{"into":"${r}3","memos":[…],"questions":[…]}（title は不要）
+- 既存のフォルダの中に、新しいトークやフォルダを作る：最上位の項目に "in":"${f}2" を付ける（例：{"in":"${f}2","title":"新しいトーク","memos":[…]}）
+- in と into は、同じ項目に両方付けないでください。番号は「既存の構造」にあるものだけを使い、作り出さないでください。
+- 同じJSONの中で新しく作るフォルダやトークには、番号は付きません。入れ子で書いてください。
+
+`;
 const RULES_PROMPT=(ref,rec)=>`あなたは、メモアプリ「NSNS」に入れる形に、私の考えや会話を整えるアシスタントです。この下に続く私との会話（またはこのあとに私が書く内容）が材料です。何をどう整えるかは、会話しながら一緒に決めます。
 
 # NSNSの考え方
@@ -2124,21 +2148,7 @@ ${treeForAI(rec)}
 データ化（表にする）／資料化（読み返せるまとめ1本にする）
 
 # 出力形式
-## 1・2：メモと問い
-{"format":"NSNS-JSON","v":1,"type":"memos","ref":"${ref}","title":"このまとまりの名前（20字以内）","folders":[{"title":"大分類","folders":[{"title":"テーマ","rooms":[{"title":"元の考え","memos":[{"text":"原文","kind":"idea","st":null,"tags":["タグ"]}]},{"title":"最初の問い（トーク名）"},{"title":"問いを並べるトーク","questions":["最初の問い","次の問い"]},{"title":"思考法のトーク","method":"M5","why":"20字以内の理由"}]}]}],"rooms":[]}
-- folders は入れ子にできます。フォルダが要らないときは、最上位の rooms だけで構いません。
-- rooms の title は60字以内です。memos・questions・method・why は省略できます。メモと問いは、同じトークに両方入れても構いません。
-- memos も questions も method も無いトークは、トーク名が最初の問いになります。method だけなら、標準の問いが入ります。枠型・対象型は "targets":["A案","B案"] で対象を指定できます。
-- kind（1件に1つ）: ${KINDS.map(k=>`${k.id}＝${k.label}（${k.desc}）`).join(' ／ ')} ／ null＝迷うとき
-- st: draft＝未確定・未着手 ／ fixed＝決めたこと ／ done＝終わったこと ／ null＝状態なし。task は draft か done だけ。
-- tags は0〜3個。迷うときは付けない。
-
-## 既存に足す（上の「既存の構造」の番号を使う）
-- 既存のトークに、メモや問いを足す：{"into":"r3","memos":[…],"questions":[…]}（title は不要）
-- 既存のフォルダの中に、新しいトークやフォルダを作る：最上位の項目に "in":"f2" を付ける（例：{"in":"f2","title":"新しいトーク","memos":[…]}）
-- in と into は、同じ項目に両方付けないでください。番号は「既存の構造」にあるものだけを使い、作り出さないでください。
-- 同じJSONの中で新しく作るフォルダやトークには、番号は付きません。入れ子で書いてください。
-
+${MEMOS_FMT(ref,'f','r')}
 ## 3：データ化
 {"format":"NSNS-JSON","v":1,"type":"data","ref":"${ref}","title":"表の名前","columns":["日付","項目","金額"],"rows":[{"cells":["11/20","電気代","8,400円"]}]}
 - 列は3〜7個。1行が1件。書かれていない値は ""。
@@ -2175,7 +2185,7 @@ function copyPrompt(type,o){
   aiCopy(rec,PROMPTS[type](o,aiX(rec)));
 }
 function aiX(rec){let mi=0,ri=0;const inv=new Map();
-  return {ref:rec.id,rm:m=>{if(inv.has(m.id))return inv.get(m.id);const k='m'+(++mi);rec.refs[k]=m.id;inv.set(m.id,k);return k},rr:r=>{if(inv.has(r.id))return inv.get(r.id);const k='r'+(++ri);rec.refs[k]=r.id;inv.set(r.id,k);return k}}}
+  return {ref:rec.id,rec,rm:m=>{if(inv.has(m.id))return inv.get(m.id);const k='m'+(++mi);rec.refs[k]=m.id;inv.set(m.id,k);return k},rr:r=>{if(inv.has(r.id))return inv.get(r.id);const k='r'+(++ri);rec.refs[k]=r.id;inv.set(r.id,k);return k}}}
 function aiPlace(roomIds){const ps=[...new Set(roomIds.map(id=>S.nodes.get(id)?.parentId||null))];
   if(ps.length===1)return ps[0];return S.cwd&&S.nodes.has(S.cwd)?S.cwd:null}
 /* 分類：80件ずつ。queue の先頭から次の束を送る */
