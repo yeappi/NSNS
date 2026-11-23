@@ -891,7 +891,6 @@ function renderRoom(keepScroll){
     bottom=`<div class="selbar">
       <button class="pri" data-act="selExport" ${dis}><span class="ic">↗</span>書き出す</button>
       <button data-act="selClassify" ${dis}><span class="ic">🏷</span>分類</button>
-      <button data-act="selAI" ${dis}><span class="ic">🤖</span>AI</button>
       <button data-act="selMove" ${dis}><span class="ic">⇢</span>移動</button>
       <button data-act="selDelete" ${dis} style="color:#C9583F"><span class="ic">🗑</span>削除</button>
       <button data-act="selMore" ${dis}><span class="ic">⋯</span>その他</button></div>`;
@@ -1128,8 +1127,7 @@ function nodeMenu(id){
     n.type==='room'?{toggle:true,icon:'💬',label:'相槌',sub:'メモを送ると、ひとこと返事します',on:!!n.aizuchi,fn:async on=>{n.aizuchi=on;await saveNode(n);if(!on){clearTimeout(aizT);aizT=null;setTyping(null)}toast(on?'相槌をオンにしました':'相槌をオフにしました')}}:null,
     n.type==='room'&&S.roomId===n.id?{icon:'☑',label:'まとめて選択',sub:'メモを選んで分類・書き出し・移動',fn:()=>selStart()}:null,
     {icon:'✎',label:'名前・アイコン・タグを編集',fn:()=>editNodeSheet(n)},
-    {icon:'↗',label:'ここから書き出す',fn:()=>openExport({scope:[n.id]})},
-    {icon:'🤖',label:'AIに頼む・書き出す',sub:'分類・分解・データ化・資料化・ブレストなど',fn:()=>aiNodeMenu(n)},
+    {icon:'↗',label:'書き出す・AIに頼む',sub:'分類・分解・データ化・資料化・ブレストなど',fn:()=>openExport({scope:[n.id]})},
     !n.docs&&!ib?{icon:'🗄',label:n.archived?'アーカイブから戻す':'アーカイブする',sub:n.archived?'':(n.type==='folder'?'中のトークごと、アーカイブ帯にしまう':'アーカイブ帯にしまう。検索には出ます'),fn:()=>setArchived([n],!n.archived)}:null,
     ib?null:{icon:'⇢',label:'移動する',fn:()=>moveSheet(n)},
     n.type==='room'?{icon:n.badge?'○':'●',label:n.badge?'バッジを出さない':'未書き出しバッジを出す',fn:async()=>{n.badge=!n.badge;await saveNode(n);renderList()}}:null,
@@ -2781,6 +2779,7 @@ function renderData(P){
       <div class="ttl"><div class="tx"><div class="nm">${esc(dvTitle(v,inRoom?gv:null))}</div><div class="sb">${inRoom?'抽出ルーム':'ビュー'}${changed?' · 条件を変更中':''}</div></div></div>
       ${inRoom?`<button class="dvfbtn${D.showF?' on':''}" data-act="dv" data-d="showF">絞込${dvFCount(v)?`<i>${dvFCount(v)}</i>`:''}</button>`:''}
       <button class="icon dvfavb${v.fav?' on':''}" data-act="dv" data-d="${saved?'favcur':'save'}" title="${saved?'お気に入り':'ビューを保存'}">${saved?(v.fav?'★':'☆'):'💾'}</button>
+      <button class="icon" data-act="dv" data-d="export" title="書き出す">${ICONS.out}</button>
       <button class="icon" data-act="dv" data-d="menu" title="メニュー">${ICONS.more}</button></div>`;
   }
   if(chat!=null){
@@ -2788,7 +2787,7 @@ function renderData(P){
     const bottom=D.sel?`<div class="selbar">
       <button data-act="dv" data-d="selcls" ${D.sel.size?'':'disabled'}><span class="ic">🏷</span>分類</button>
       <button data-act="dv" data-d="seldone" ${D.sel.size?'':'disabled'}><span class="ic">✓</span>完了</button>
-      <button data-act="dv" data-d="selai" ${D.sel.size?'':'disabled'}><span class="ic">🤖</span>AI</button>
+      <button data-act="dv" data-d="selai" ${D.sel.size?'':'disabled'}><span class="ic">↗</span>書き出す</button>
       <button data-act="dv" data-d="selmove" ${D.sel.size?'':'disabled'}><span class="ic">⇢</span>移動</button>
       <button data-act="dv" data-d="seldel" ${D.sel.size?'':'disabled'} style="color:#C9583F"><span class="ic">🗑</span>削除</button></div>`
       :w?`<div class="composer"><div class="crow"><textarea id="dvta" rows="1" placeholder="${esc(dvMarkText(D.v,D.gv))}"></textarea><button class="send" id="dvsend" data-act="dv" data-d="send" title="送信">${ICONS.send}</button></div></div>`:`<div class="dvro">資料のビューは見るだけです</div>`;
@@ -2859,12 +2858,12 @@ function dvAct(el,e){
     case 'selmove':{const l=dvSelList();if(!l.length)break;D.sel=null;moveMsgsSheet(l);break}
     case 'seldel':{const l=dvSelList();if(!l.length)break;D.sel=null;trashMsgList(l);break}
     case 'aicls':{const l=dvCurMsgs().filter(m=>m.by!=='ai');if(l.length)copyPrompt('classify',{msgs:l});break}
+    case 'export':{if(!v)break;const l=dvCurMsgs().filter(m=>m.by!=='ai');if(!l.length){toast('書き出すメモがありません');break}openExport({ids:l.map(m=>m.id)});break}
     case 'menu':{if(!v)break;const l=dvCurMsgs().filter(m=>m.by!=='ai');
       const saved=v.id&&!v.id.startsWith('p:');
       menuSheet(dvTitle(v,D.mode==='room'?D.gv:null),[
         D.mode==='room'?{icon:'☑',label:'選択する',sub:'まとめて分類・完了・移動',fn:()=>{D.sel=new Set();renderList()}}:null,
         {icon:'↗',label:'書き出す',sub:`${l.length}件`,fn:()=>{if(!l.length){toast('書き出すメモがありません');return}openExport({ids:l.map(m=>m.id)})}},
-        {icon:'🤖',label:'AIに頼む',sub:`${l.length}件を渡す`,fn:()=>{if(!l.length){toast('渡すメモがありません');return}aiAskMsgs(l,dvTitle(v,D.mode==='room'?D.gv:null))}},
         saved?{icon:'✏️',label:'名前を変える',fn:async()=>{const n=await promptSheet('ビューの名前',v.name,'名前');if(n){v.name=n;dvPersist(v);renderList()}}}:null,
         saved?{icon:'🗑',label:'このビューを消す',sub:'中のメモは消えません',danger:true,fn:async()=>{if(!await confirmSheet('このビューを消しますか？','メモは消えません','消す',true))return;dvSaveAll(dvSaved().filter(x=>x.id!==v.id).map(x=>({id:x.id,name:x.name,group:x.group,f:x.f,fav:!!x.fav,gv:x.gv})));D.mode='home';D.v=null;renderList()}}:null,
       ]);break}
