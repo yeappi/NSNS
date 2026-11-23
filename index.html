@@ -2079,17 +2079,23 @@ ${msgs?rooms.map(r=>{const ms=msgs.filter(m=>m.roomId===r.id);return `## トー�
 const folderNamesForAI=()=>{const a=[...S.nodes.values()].filter(n=>n.type==='folder'&&!n.archived).map(n=>n.name).slice(0,30);return a.length?a.join(' / '):'（まだありません）'};
 const RULES_PROMPT=ref=>`あなたは、メモアプリ「NSNS」に入れる形に、私の考えや会話を整えるアシスタントです。この下に続く私との会話（またはこのあとに私が書く内容）が材料です。メモアプリ側には、まだ何も渡していません。何をどう整えるかは、会話しながら一緒に決めます。
 
+# NSNSの考え方
+- 土台は「メモ」です。会話の中身は、必ず原文に近いメモとして残します（元の考えを失わない）。
+- その上に、必要なときだけ「問い」を足します。問いは、トークを開くと1つずつ出て、私が答えを書き込みます。問いを足す方法は、「直接の問い」と「思考法」の2つです。
+- 「まとめを作る」（表にする・資料にする）は、土台とは別の出力です。
+- 置き場所は「フォルダ ＞ トーク」で、フォルダは入れ子にできます（3階層まで）。1つのトークには、1つのお題だけを入れます。
+
 # 進め方
 1. まず「この内容をどうしたいか」を短く1つだけ聞いてください。私が迷っていそうなら、下の「できること」から2〜3個、理由を添えて提案してください。
-2. 案は、人が読みやすい形で見せてください。JSONはまだ出さないでください。トーク名・メモ・問いなど、中身まで具体的に見せてください。
+2. 案は、人が読みやすい形で見せてください。フォルダ・トーク名・メモ・問いまで、中身を具体的に見せてください。JSONはまだ出さないでください。
 3. 私が直してほしいところを伝えるので、反映した案を出し直してください。何度でも構いません。
-4. 私が「確定」と言ったら（「すぐ確定で」のように案を飛ばしてよいと言ったときも）、決まった内容を、下の「出力形式」のどれか1つのJSONにしてください。出すのは、件数を書いた1行と、コードブロック1つだけです。
-- 2つ以上やりたいとき（例：メモにしてから資料にまとめる）は、1つずつ確定して、JSONを1つずつ出してください。1つのJSONに混ぜないでください。
+4. 私が「確定」と言ったら（「すぐ確定で」のように案を飛ばしてよいと言ったときも）、決まった内容を、下の「出力形式」のJSONにしてください。出すのは、件数を書いた1行と、コードブロック1つだけです。
+- 大きな構成（トークが30個を超えるなど）は、大分類ごとに分けて、1つずつJSONを出してください。1回で出し切ろうとして途中で切れるより、分けるほうが確実です。
 - JSONを出す直前に、下の「出力形式」をもう一度読み直してください。会話が長くなっても、形は見本どおりにしてください。
 
 # 共通ルール
-- 会話にない事実を足さないでください。推測で埋めないでください。
-- 本文は、私の言葉づかいをなるべく残してください。ただし私が「整えて」「まとめて」と頼んだときは、その度合いに従ってください（${Object.entries(LV_TXT).map(([k,v])=>v).join(' ／ ')}）。
+- 会話にない事実を足さないでください。推測で埋めないでください。元の情報が少ないテーマも、勝手に設定を補わないでください。
+- 元の考えは、私の言葉づかいをなるべく残してください。ただし私が「整えて」「まとめて」と頼んだときは、その度合いに従ってください（${Object.entries(LV_TXT).map(([k,v])=>v).join(' ／ ')}）。
 - AIの返答や前置きはメモに入れず、私が決めたこと・考えたこと・やることだけを残してください。
 - メモ1件は1つの話題だけにしてください。長い話は分けてください。
 - "ref" には必ず "${ref}" と入れてください。
@@ -2100,42 +2106,59 @@ const RULES_PROMPT=ref=>`あなたは、メモアプリ「NSNS」に入れる形
 - 既存のフォルダ: ${folderNamesForAI()}
 - タグは、まず既存のものから選んでください。合うものがないときだけ新しく作ってください。
 
-# できること（選択肢と返し方）
+# できること
 
-## A. メモにする：話題ごとにトークを作り、メモを入れる（種類・状態・タグも付ける）
-向く場面：会話や考えを、あとで探せる・見返せる形で残したい。やることだけ抜き出したい。
-{"nsns":1,"type":"memos","ref":"${ref}","rooms":[{"title":"トーク名（20字以内）","memos":[{"text":"メモの本文","kind":"task","st":"draft","tags":["タグ"]}]}]}
-- kind（1件に1つ）: ${KINDS.map(k=>`${k.id}＝${k.label}（${k.desc}）`).join(' ／ ')} ／ null＝どれとも言えない
-- st: draft＝未確定・未着手 ／ fixed＝決めたこと ／ done＝終わったこと ／ null＝状態を持たない。task は draft か done だけです。
-- tags は0〜3個です。迷うときは付けないでください。
-- rooms は1〜8個です。トークごとに、読み返して意味が通るようにまとめてください。
+## 1. 土台：メモにする（必ず最初に決める）
+会話の中身を、話題ごとのトークに分けて、メモとして入れます。種類・状態・タグも付けます。
+- 向く場面：考えを、あとで探せる・見返せる形で残したい。やることだけ抜き出したい。
+- 元の考えは、トーク名「元の考え」のように、1つのトークにまとめて残すのが基本です。
 
-## B. ブレスト：論点ごとのトークを、フォルダにまとめて作り、各トークに「問い」を置く
-向く場面：考えがまとまっておらず、問いに答えながら深めたい。
-{"nsns":1,"type":"memos","ref":"${ref}","folder":"全体のテーマ（15字以内）","rooms":[{"title":"論点（20字以内）","questions":["最初の問い","次の問い"]}]}
-- 論点は3〜8個、重ならないように分けてください。
-- questions は各論点1〜3個。短く具体的に。はい／いいえで終わらない問いにしてください。私が答えやすい順に並べてください。問いはトークを開くと1つずつ出て、私が答えを書き込みます。
-- 論点にメモも入れたいときは、同じトークに "memos"（Aと同じ形）を足せます。
-- folder は、トークが2つ以上あるときに付けてください。
+## 2. 問いを足す（1の上に載せる）
+### 2-a. 直接の問い：答えが欲しい具体的な疑問を、そのまま聞く
+- 1つの疑問を1トークにします。トーク名が、そのまま最初の問いです。
+- 問いは具体的にしてください。「どうしたい？」のような漠然とした問いは避けて、現状・障害・具体的な1つの場面を聞く形にしてください。はい／いいえで終わらない形にしてください。
+- 問いが前の答えを受けて進むときは、同じトークに複数の問いを並べてください。
 
-## C. AI思考法：思考法を選び、その考え方に沿った問いのトークを作る
-向く場面：テーマは決まっているが、どう考えれば深まるか分からない。
-{"nsns":1,"type":"memos","ref":"${ref}","folder":"テーマ","rooms":[{"title":"枠の名前（15字以内）","method":"M3","why":"20字以内の理由","questions":["…","…"]}]}
-- method は、下の【思考法カタログ】のIDだけを使ってください。カタログにない思考法は使わないでください。
-- 提案するときは、レベルを選べるようにしてください。レベル1＝全体で合う思考法を1つ ／ レベル2＝合う思考法をTOP3 ／ レベル3以上＝テーマごとに専用の問いも作る（3＝優先度が高いものだけ、4＝低くないもの、5＝すべて）。
-- 問いが前の答えを受けて進むなら1つのトークにまとめ、問い同士が独立しているなら枠ごとにトークを分けてください。
+### 2-b. 思考法：考える手順そのものが大事なときだけ使う
+- 答えが欲しい疑問は、思考法を使わず、直接聞いてください。思考法は、手順そのものが役に立つときだけ使ってください。全部に当てはめないでください。
+- 思考法は、下の【思考法カタログ】のIDだけを使ってください。カタログにない思考法は作らないでください。
+- 使い方は2つあります。
+  - IDだけ指定する：アプリが、カタログの「標準の問い」をそのまま入れます。枠型・対象型は、フォルダとトークに自動で広がります。
+  - 問いを自分で書く：IDを付けたうえで、私のテーマに合わせた問いを書きます。カタログの手順と問いの数は保ち、中身を私のテーマに具体的にしてください。
+- 提案するときは、「なぜこの思考法か」を一言添えてください。
 
-## D. データ化：数字や項目がそろった情報を、1つの表にする
-向く場面：日付・項目・金額など、列にできる情報が会話に出てきた。
+## 3. まとめを作る（1とは別の出力）
+- データ化：数字や項目がそろった情報を1つの表にする。
+- 資料化：結論・決めたこと・残った疑問・次にやることを、読み返せる1本にまとめる。
+
+# 出力形式
+
+## 1・2：メモと問いは、同じ形で入れる
+{"nsns":1,"type":"memos","ref":"${ref}","folders":[{"title":"大分類","folders":[{"title":"テーマ","rooms":[{"title":"元の考え","memos":[{"text":"原文","kind":"idea","st":null,"tags":["タグ"]}]},{"title":"最初の問い（トーク名）"},{"title":"問いを2つ以上並べるトーク","questions":["最初の問い","次の問い"]},{"title":"思考法付きのトーク","method":"M5","why":"20字以内の理由"}]}]}],"rooms":[]}
+- folders は入れ子にできます（フォルダの中に folders と rooms）。フォルダが要らないときは、最上位の rooms だけで構いません。
+- rooms の中身は次のとおりです。
+  - title：トーク名（60字以内）。
+  - memos：メモの配列（省略可）。
+  - questions：問いの配列（省略可）。
+  - method：思考法のID（省略可）。
+  - why：method の理由（省略可）。
+- メモと問いは、同じトークに両方入れても構いません。
+- memos も questions も method も無いトークは、トーク名が最初の問いになります。
+- method だけで questions が無いときは、標準の問いが入ります。枠型・対象型は、対象を "targets":["A案","B案"] で指定できます。
+- memos の項目は次のとおりです。
+  - kind（1件に1つ）: ${KINDS.map(k=>`${k.id}＝${k.label}（${k.desc}）`).join(' ／ ')} ／ null＝どれとも言えない。迷ったら null です。
+  - st: draft＝未確定・未着手 ／ fixed＝決めたこと ／ done＝終わったこと ／ null＝状態を持たない。task は draft か done だけです。
+  - tags は0〜3個です。迷うときは付けないでください。
+
+## 3：データ化
 {"nsns":1,"type":"data","ref":"${ref}","title":"表の名前","columns":["日付","項目","金額"],"rows":[{"cells":["11/20","電気代","8,400円"]}]}
 - 列は3〜7個です。1行が1件の記録です。書かれていない値は "" にしてください。
 
-## E. 資料化：読み返せるまとめ1本にする
-向く場面：結論・決めたこと・残った疑問・次にやることを、1枚にまとめたい。
+## 3：資料化
 {"nsns":1,"type":"digest","ref":"${ref}","title":"20字以内","lines":["■ 結論・決めたこと","・…","■ 残っている疑問","・…","■ 次にやること","・…"],"archive":[]}
 - 1行を配列の1要素にしてください。archive は空のままで構いません。
 
-# 思考法カタログ（Cで使う）
+# 思考法カタログ（2-bで使う）
 ${mCatalogForAI()}
 `;
 const AI_LABEL={consult:'AIと相談',classify:'分類',brainstorm:'ブレスト',next:'次の問い',questions:'次の問い',digest:'資料化',think:'AI思考法',split:'分解',data:'データ化',memos:'メモ作成'};
@@ -2214,7 +2237,13 @@ const THINK_LV=[
  [3,'優先度が特に高いトークだけ、AI専用の問い＋TOP3'],
  [4,'優先度が低くないトークに、AI専用の問い＋TOP3'],
  [5,'すべてのトークに、AI専用の問い＋TOP3']];
-const mCatalogForAI=()=>MC.map(c=>`${c.id} ${c.n}｜向く場面：${c.sc}｜型：${c.ty==='rep'?'繰り返し':'順番'}｜部屋：${{one:'1部屋',frames:'枠ごと',targets:'対象ごと'}[c.rm]}`).join('\n');
+const M_MEAN={M1:'「なぜ」を繰り返して根本の原因まで降りる',M2:'友達の悩みとして考え、自分に言い直す',M3:'失敗した未来から逆算して、原因と対策を出す',M4:'選択肢ごとに良い点・悪い点を出して比べる',M5:'「もし〇〇なら△△する」の形で、行動の引き金を決める',M6:'「つまり？」「例えば？」を往復して、ぼんやりを言葉にする',M7:'当たり前の前提を疑い、外して組み直す',M8:'ゴールから逆算して、今日やることまで降ろす',M9:'10分後・10ヶ月後・10年後の目で見直す',M10:'最悪・最良・現実の3つを出して、最悪でも大丈夫か確かめる',M11:'事実と気持ちを分けて、本当の望みに気づく',M12:'反対の立場から検討して、判断を固める',M13:'人に説明するつもりで書き、詰まったところを見つける',M14:'本当に答えを出したい問いを決める',M15:'ゴール・現状・選択肢・行動の順に整理する',M16:'急ぎ×大事の4枠にやることを仕分ける',M17:'事実・気持ち・リスク・良い点・アイデア・まとめの6つの角度で見る',M18:'置き換え・組み合わせなどの切り口で、今あるものを変える',M19:'似ているものから、解決のしかたを借りる',M20:'強み・弱み・追い風・向かい風で今を把握する',M21:'仮の答えを先に置き、根拠と確かめ方を決める',M22:'続けること・困ったこと・次に試すことで振り返る'};
+function mQDesc(c){if(c.ty==='rep')return `最初の問い「${c.first.join('／')}」→ 繰り返し「${c.rep.join('／')}」（最大${c.max}回）${c.last.length?`→ 最後「${c.last.join('／')}」`:''}`;
+  if(c.rm==='frames')return c.frames.map(([lb,q])=>`${lb}：${q}`).join(' ／ ');
+  if(c.rm==='targets')return `対象（${c.targets.join('・')}）ごとに ${c.q.join(' → ')}${c.final?` ／ 最後に比べる：${c.final.join('／')}`:''}`;
+  return c.q.join(' → ')}
+const M_TYPE={one:'1トークで順に聞く',frames:'枠ごとにトークを分ける（フォルダになる）',targets:'比べる対象ごとにトークを分け、最後に比べるトークを作る（フォルダになる）'};
+const mCatalogForAI=()=>MC.map(c=>`${c.id} ${c.n}｜${M_MEAN[c.id]||''}｜向く場面：${c.sc}｜${c.ty==='rep'?'1トークで、問いを繰り返して掘る':M_TYPE[c.rm]}｜標準の問い：${mQDesc(c)}`).join('\n');
 PROMPTS.think=({rooms,level},X)=>{
   const per=level>=3;const tgt={3:'優先度が「高」',4:'優先度が「高」または「中」',5:'すべて'}[level];
   return `あなたは考えを深める手伝いをするアシスタントです。下の【トーク】を読んで、【思考法カタログ】から合う思考法を選んでください。${per?`さらに、${tgt}のトークには、そのテーマ専用の問いを作ってください。`:''}
@@ -2457,39 +2486,70 @@ function planData(j,rec){
       return {nodes,roots:nodes,msgs:[m.id],open:docs.id}}};
 }
 function planMemos(j,rec){
-  const mapT=tagMapper();
-  const fo=j.folder==null?'':String(typeof j.folder==='object'?(j.folder.title||j.folder.name||''):j.folder).trim().slice(0,40);
-  const rooms=(Array.isArray(j.rooms)?j.rooms:[]).map(r=>({title:String(r?.title||r?.name||'').trim().slice(0,60),
-    qs:(Array.isArray(r?.questions)?r.questions:[]).map(x=>String(x).trim()).filter(Boolean),
-    method:MCB.has(String(r?.method||'').trim())?{m:String(r.method).trim(),why:String(r.why||'').slice(0,40)}:null,
-    memos:(Array.isArray(r?.memos)?r.memos:[]).map(x=>typeof x==='string'?{text:x}:x).filter(x=>x&&String(x.text||'').trim()).map(x=>{
-      let kind=isNull(x.kind)?null:String(x.kind).trim();if(kind&&!KIND[kind]){const w=kindWord(kind.toLowerCase());kind=w===undefined?null:w}
-      let st=isNull(x.st)?null:String(x.st).trim();if(st&&!STL[st])st={'未確定':'draft','確定':'fixed','完了':'done'}[st]||null;
-      if(kind==='task'&&st==='fixed')st='draft';
-      return {text:String(x.text).trim(),kind,st,tags:[...new Set((Array.isArray(x.tags)?x.tags:[]).map(mapT).filter(Boolean))].slice(0,5)}})})).filter(r=>r.memos.length||r.qs.length);
-  if(!rooms.length)throw new Error('メモも問いもありません（rooms[].memos / questions が空です）');
-  rooms.forEach((r,i)=>{if(!r.title)r.title='AIと整理 '+(i+1)});
+  const mapT=tagMapper();const RL=[];let nF=0;
+  const tt=(x,n)=>String(x||'').trim().slice(0,n);
+  const memoOf=x=>{x=typeof x==='string'?{text:x}:x;if(!x||!String(x.text||'').trim())return null;
+    let kind=isNull(x.kind)?null:String(x.kind).trim();if(kind&&!KIND[kind]){const w=kindWord(kind.toLowerCase());kind=w===undefined?null:w}
+    let st=isNull(x.st)?null:String(x.st).trim();if(st&&!STL[st])st={'未確定':'draft','確定':'fixed','完了':'done'}[st]||null;
+    if(kind==='task'&&st==='fixed')st='draft';
+    return {text:String(x.text).trim(),kind,st,tags:[...new Set((Array.isArray(x.tags)?x.tags:[]).map(mapT).filter(Boolean))].slice(0,5)}};
+  const mkRoom_=(r,path)=>{const title=tt(r?.title||r?.name,60);const c=MCB.get(tt(r?.method,8));
+    const qs=(Array.isArray(r?.questions)?r.questions:[]).map(x=>String(x).trim()).filter(Boolean);
+    const memos=(Array.isArray(r?.memos)?r.memos:[]).map(memoOf).filter(Boolean);
+    const method=c?{m:c.id,why:tt(r.why,40)}:null;
+    // 思考法だけ指定：標準の問いを使う（枠・対象ごとのものはフォルダ＋トークに広げる）
+    if(c&&!qs.length&&c.rm!=='one'){const T=title||c.n;const rooms=[];
+      if(c.rm==='frames')c.frames.forEach(([lb,q])=>rooms.push({k:'r',title:`${c.n}｜${lb}`,memos:[],std:[q],mm:c.id,method:null,path:[]}));
+      else{const tg=(Array.isArray(r.targets)?r.targets:[]).map(x=>tt(x,30)).filter(Boolean);(tg.length?tg:c.targets).forEach(lb=>rooms.push({k:'r',title:`${c.n}｜${lb}`,memos:[],std:[...c.q],mm:c.id,method:null,path:[]}));
+        if(c.final)rooms.push({k:'r',title:`${c.n}｜比べる`,memos:[],std:[...c.final],mm:c.id,method:null,path:[]})}
+      if(memos.length)rooms.unshift({k:'r',title:'元の考え',memos,std:null,method:null,path:[]});
+      return {k:'f',title:T,ch:rooms,method}}
+    const room={k:'r',title:title||(c&&c.n)||'',memos,qs:null,std:null,method};
+    if(qs.length)room.qs=qs;else if(c)room.mid=c.id;else if(!memos.length&&title)room.qs=[title]; // 問いだけのトーク：トーク名が最初の問い
+    if(!room.title)room.title=memos.length?'AIと整理':'問い';
+    if(!memos.length&&!room.qs&&!room.mid)return null;return room};
+  const walk=(a,depth)=>{const out=[];
+    for(const f of (Array.isArray(a.folders)?a.folders:[])){if(depth>=3||!f)continue;const ch=walk(f,depth+1);if(ch.length)out.push({k:'f',title:tt(f.title||f.name,40)||'フォルダ',ch})}
+    for(const r of (Array.isArray(a.rooms)?a.rooms:[])){const n=mkRoom_(r,[]);if(n)out.push(n)}
+    return out};
+  const top=Object.assign({},j);
+  if(j.folder&&!Array.isArray(j.folders)){const t=typeof j.folder==='object'?(j.folder.title||j.folder.name):j.folder;top.folders=[{title:t,rooms:j.rooms}];top.rooms=[]}
+  const tree=walk(top,0);
+  // 平らな一覧（確認画面の項目）
+  const items=[];const reg=(n,path)=>{if(n.k==='f'){n.ch.forEach(c=>reg(c,[...path,n.title]));return}
+    n.ri=RL.length;RL.push(n);n.path=path;n.memos.forEach(m=>items.push({ri:n.ri,m}));if(n.qs||n.std||n.mid)items.push({ri:n.ri,q:true})};
+  tree.forEach(n=>reg(n,[]));
+  if(!RL.length)throw new Error('メモも問いもありません（folders / rooms が空です）');
+  if(RL.length>150)throw new Error('トークが多すぎます（150個まで）。大分類ごとに分けて出してもらってください');
+  const qOf=r=>r.qs||r.std||(r.mid?mSteps(MCB.get(r.mid)).steps:[]);
   let pid=S.cwd&&S.nodes.has(S.cwd)?S.cwd:null;const where=pid?S.nodes.get(pid).name:'ホーム';
-  const items=[];rooms.forEach((r,ri)=>{r.memos.forEach(m=>items.push({ri,m}));if(r.qs.length)items.push({ri,q:r.qs})});
-  const nM=items.filter(x=>x.m).length,nQ=items.filter(x=>x.q).reduce((a,x)=>a+x.q.length,0);
+  const nM=items.filter(x=>x.m).length,nQ=items.filter(x=>x.q).length;
+  const nFo=(function c(a){return a.reduce((n,x)=>n+(x.k==='f'?1+c(x.ch):0),0)})(tree);
+  const path=r=>r.path.length?`<small style="color:var(--sub)">${r.path.map(esc).join(' › ')} › </small>`:'';
   return {count:items.length,
-    pick:items.map(x=>x.q?{on:true,html:`❓ <b>${esc(rooms[x.ri].title)}</b>の問い${x.q.length}件<br><small>${x.q.map(esc).join(' / ')}</small>`}
-      :{on:true,html:`${x.m.kind?kindText(x.m.kind):'<span style="color:var(--sub)">未分類</span>'}${x.m.st?` <span class="sc ${x.m.st}">${stLabel(x.m,x.m.st)}</span>`:''}${x.m.tags.length?` <span class="at">${x.m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`:''}<br><small>${esc(flat(x.m.text).slice(0,60))}</small>`}),
-    html:`「${esc(where)}」に${fo?`フォルダ「<b>${esc(fo)}</b>」を作り、その中に`:''}トーク ${rooms.map(r=>`「<b>${esc(r.title)}</b>」`).join('')} を作ります（メモ${nM}件${nQ?`・問い${nQ}件`:''}、チェックしたものだけ）。`,
-    apply:async(iid,picked)=>{const t=now();const nodes=[],msgs=[];let k=0,fol=null;
-      const use=items.map((x,i)=>({...x,i})).filter(x=>!picked||picked[x.i]);if(!use.length)return {nodes:[],roots:[],msgs:[]};
-      if(fo){fol={id:uid(),type:'folder',parentId:pid,name:fo,emoji:'🧠',color:PALETTE[3],tags:[],order:nextTopOrder(pid),createdAt:t,importId:iid};nodes.push(fol)}
-      const rp=fol?fol.id:pid;
-      for(let ri=0;ri<rooms.length;ri++){const mine=use.filter(x=>x.ri===ri);if(!mine.length)continue;const r=rooms[ri];
-        const ro={id:uid(),type:'room',parentId:rp,name:r.title,emoji:'',color:PALETTE[ri%7],tags:[],badge:true,order:fol?++k:nextTopOrder(pid)+(k++),createdAt:t,lastAt:t,importId:iid};
-        const q=mine.find(x=>x.q);if(q){ro.mrun={mid:'AI',pos:0,steps:q.q};ro.qroom=true}
-        if(r.method)ro.rec=[r.method];
-        nodes.push(ro);
-        mine.filter(x=>x.m).forEach((x,n)=>{const m={id:uid(),roomId:ro.id,text:x.m.text,images:[],createdAt:t+n,exportedAt:null,exportId:null,importId:iid,tags:x.m.tags};
-          if(x.m.kind){m.kind=x.m.kind;m.kindBy='ai'}if(x.m.st){m.st=x.m.st}msgs.push(m)})}
+    pick:items.map(x=>{const r=RL[x.ri];return x.q?{on:true,html:`${path(r)}<b>${esc(r.title)}</b>　❓${r.mid&&!r.qs?`標準の問い（${esc(MCB.get(r.mid).n)}）`:'問い'}${qOf(r).length}件<br><small>${qOf(r).slice(0,3).map(esc).join(' / ')}${qOf(r).length>3?' …':''}</small>`}
+      :{on:true,html:`${path(r)}<b>${esc(r.title)}</b>　${x.m.kind?kindText(x.m.kind):'<span style="color:var(--sub)">未分類</span>'}${x.m.st?` <span class="sc ${x.m.st}">${stLabel(x.m,x.m.st)}</span>`:''}${x.m.tags.length?` <span class="at">${x.m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`:''}<br><small>${esc(flat(x.m.text).slice(0,60))}</small>`}}),
+    html:`「${esc(where)}」に、${nFo?`フォルダ <b>${nFo}</b>個と、`:''}トーク <b>${RL.length}</b>個を作ります（メモ${nM}件${nQ?`・問い付き${nQ}個`:''}）。下でチェックしたものだけが入ります。`,
+    apply:async(iid,picked)=>{const t=now();const nodes=[],msgs=[];
+      const use=new Map();items.forEach((x,i)=>{if(picked&&!picked[i])return;const u=use.get(x.ri)||{m:[],q:false};x.m?u.m.push(x.m):u.q=true;use.set(x.ri,u)});
+      if(!use.size)return {nodes:[],roots:[],msgs:[]};
+      let ci=0;
+      const build=(list,parent,top)=>{const made=[];
+        const ready=list.filter(function ok(n){return n.k==='f'?n.ch.some(ok):use.has(n.ri)});
+        ready.forEach((n,i)=>{const order=top?nextTopOrder(parent)-(ready.length-1)+i:i;
+          if(n.k==='f'){const fo={id:uid(),type:'folder',parentId:parent,name:n.title,emoji:'',color:PALETTE[(ci++)%7],tags:[],order,createdAt:t,importId:iid};nodes.push(fo);build(n.ch,fo.id,false);made.push(fo.id);return}
+          const u=use.get(n.ri);
+          const ro={id:uid(),type:'room',parentId:parent,name:n.title,emoji:'',color:PALETTE[(ci++)%7],tags:[],badge:true,order,createdAt:t,lastAt:t,importId:iid};
+          if(u.q){if(n.mid&&!n.qs)ro.mrun={mid:n.mid,pos:0};else ro.mrun={mid:n.mm||(n.method?n.method.m:'AI'),pos:0,steps:qOf(n)};ro.qroom=true}
+          if(n.method)ro.rec=[n.method];
+          nodes.push(ro);made.push(ro.id);
+          u.m.forEach((m,k)=>{const o={id:uid(),roomId:ro.id,text:m.text,images:[],createdAt:t+k,exportedAt:null,exportId:null,importId:iid,tags:m.tags};
+            if(m.kind){o.kind=m.kind;o.kindBy='ai'}if(m.st)o.st=m.st;msgs.push(o)})});
+        return made};
+      const roots=build(tree,pid,true);
       await saveNodes(nodes);if(msgs.length)await saveMsgs(msgs);if(rec&&rec.type!=='consult')aiDropRec(rec.id);
-      const rs=nodes.filter(n=>n.type==='room');
-      return {nodes:nodes.map(n=>n.id),roots:(fol?[fol.id]:nodes.map(n=>n.id)),msgs:msgs.map(m=>m.id),open:fol?fol.id:(rs.length===1?rs[0].id:null)}}};
+      const first=nodes.find(n=>n.type==='room');
+      return {nodes:nodes.map(n=>n.id),roots,msgs:msgs.map(m=>m.id),open:roots.length===1?roots[0]:null}}};
 }
 function makePlan(j,rec){
   switch(j.type){
