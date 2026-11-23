@@ -1938,7 +1938,7 @@ const PROMPTS={
   consult:({msgs},X)=>`あなたは私のメモ整理を手伝うアシスタントです。下の【メモ】は、メモアプリ「NSNS」から書き出したものです。何をするかは、会話しながら一緒に決めます。
 
 # 進め方
-1. まず「このメモで何をしたいか」を短く1つだけ聞いてください。私が迷っていそうなら、下の「できること」から2〜3個、理由を添えて提案してください。
+1. 最初に「何をしたいか」「どれにするか」を聞いたり、できることの一覧を出したりしないでください。まずは中身について、ふつうに話してください。質問するなら、中身についての問いを1つだけにします。整理の形（トークに分ける・問いを足す・まとめる など）は、会話の流れを見て、あなたから1つ提案してください。私が先に指定したら、それに従います。
 2. やることが決まったら、案を人が読みやすい形で見せてください。JSONはまだ出さないでください。
 3. 私が直してほしいところを伝えたら、反映した案を出し直してください。何度でも構いません。
 4. 私が「確定」と言ったら（「すぐ確定で」のように案を飛ばしてよいと言ったときも）、決まった内容を、下の「返し方」のどれか1つのJSONにしてください。出すのは件数を書いた1行と、コードブロック1つだけです。
@@ -1949,6 +1949,7 @@ const PROMPTS={
 - 各メモの先頭の ( ) は書いた日付です。本文ではないので、分解や資料化の本文に含めないでください。
 - メモの id は [ ] の中（m1, m2 …）、トークの id は見出しの「id:」の後ろ（r1, r2 …）をそのまま使ってください。
 - 「既存の構造」の番号（F1・T1 …）は、メモの見出しの id（r1 …）とは別物です。混ぜないでください。
+- 組み替えで作るメモには、元になったメモの id を "from":["m1","m3"] で付けてください（元の内容を使ったものだけ）。会話で新しく決まったことには from を付けません。
 - 分解を確定したあとは、分けたメモを m2-1, m2-2 …（parts の順）と呼んでください。分けた元の id（m2）はもう使えません。
 - "ref" には必ず "${X.ref}" と入れてください。
 - JSONは省略しないでください。「以下同様」などで省かないでください。
@@ -2142,12 +2143,14 @@ ${P_FLOW}
 ${msgs?rooms.map(r=>{const ms=msgs.filter(m=>m.roomId===r.id);return `## トーク「${r.name}」 id:${X.rr(r)}（選んだ${ms.length}件）\n`+ms.map(m=>'私: '+flat(m.text)).join('\n')}).join('\n\n'):rooms.map(r=>roomForAI(r,X)).join('\n\n')}
 `,
 };
-function treeForAI(rec,pf='f',pr='r'){const root=S.cwd&&S.nodes.has(S.cwd)?S.cwd:null;let nf=0,nr=0,left=0;const lines=[];
-  const walk=(pid,d)=>{for(const k of sortNodes(kids(pid))){if(k.archived||k.docs||k.inbox||k.ibArch)continue;
-    if(lines.length>=60){left++;if(k.type==='folder')left+=descendants(k.id).filter(x=>x.type==='room'&&!x.docs).length;continue}
-    const id=(k.type==='folder'?pf:pr)+(k.type==='folder'?++nf:++nr);rec.refs[id]=k.id;lines.push('  '.repeat(d)+`${id} ${k.name}`);
-    if(k.type==='folder')walk(k.id,d+1)}};
-  walk(root,0);if(left)lines.push(`…ほか${left}個（省略）`);
+function treeForAI(rec,pf='f',pr='r'){const root=S.cwd&&S.nodes.has(S.cwd)?S.cwd:null;const all=[];
+  const walk=(pid,d)=>{for(const k of sortNodes(kids(pid))){if(k.archived||k.docs||k.inbox||k.ibArch)continue;all.push([k,d]);if(k.type==='folder')walk(k.id,d+1)}};
+  walk(root,0);
+  /* 置き場所の判断にはフォルダが大事：フォルダは全部（最大150）、トークは残りの枠（合計80行まで） */
+  const nF=all.filter(([k])=>k.type==='folder').length;let budget=Math.max(0,80-Math.min(nF,150)),fl=0,left=0;
+  const keep=all.filter(([k])=>{if(k.type==='folder'){if(fl<150){fl++;return true}left++;return false}if(budget>0){budget--;return true}left++;return false});
+  let nf=0,nr=0;const lines=keep.map(([k,d])=>{const id=(k.type==='folder'?pf:pr)+(k.type==='folder'?++nf:++nr);rec.refs[id]=k.id;return '  '.repeat(d)+`${id} ${k.name}`});
+  if(left)lines.push(`…ほかトーク${left}個（省略。フォルダはすべて載せています）`);
   return `取り込み先：${root?`「${S.nodes.get(root).name}」の中`:'ホーム'}（in を付けなければ、ここに新しく作ります）\n${lines.length?lines.join('\n'):'（まだ何もありません）'}`}
 const mCatalogShort=()=>MC.map(c=>`${c.id} ${c.n}｜${M_MEAN[c.id]||''}｜向く場面：${c.sc}｜${c.ty==='rep'||c.rm==='one'?'1トーク':c.rm==='frames'?`${c.frames.length}トークに広がる`:'対象ごとのトーク＋比べるトーク'}`).join('\n');
 const MEMOS_FMT=(ref,f,r)=>`## 1・2：メモと問い
@@ -2158,6 +2161,8 @@ const MEMOS_FMT=(ref,f,r)=>`## 1・2：メモと問い
 - kind（1件に1つ）: ${KINDS.map(k=>`${k.id}＝${k.label}（${k.desc}）`).join(' ／ ')} ／ null＝迷うとき
 - st: draft＝未確定・未着手 ／ fixed＝決めたこと ／ done＝終わったこと ／ null＝状態なし。task は draft か done だけ。
 - tags は0〜3個。迷うときは付けない。
+- 会話で新しく決まったこと・方針・やると決めたことは、元の考えとは別のメモとして必ず残す（st は fixed。task なら draft）。会話の中で出た新しい情報も、取りこぼさずメモにする。
+- JSONを出す前に確認：①元の考え ②会話で決まったこと ③問い の3つが、漏れなく入っているか。
 
 ## 既存に足す（上の「既存の構造」の番号を使う）
 - 既存のトークに、メモや問いを足す：{"into":"${r}3","memos":[…],"questions":[…]}（title は不要）
@@ -2173,7 +2178,7 @@ const RULES_PROMPT=(ref,rec)=>`あなたは、メモアプリ「NSNS」に入れ
 - 置き場所は「フォルダ ＞ トーク」です。フォルダは入れ子にできます（4段まで）。1つのトークには、1つのお題だけを入れます。
 
 # 進め方
-1. まず「この内容をどうしたいか」を短く1つだけ聞いてください。迷っていそうなら、下の「できること」から2〜3個、理由を添えて提案してください。
+1. 最初に「何をしたいか」「どれにするか」を聞いたり、できることの一覧を出したりしないでください。まずは中身について、ふつうに話してください。質問するなら、中身についての問いを1つだけにします。整理の形（トークに分ける・問いを足す・まとめる など）は、会話の流れを見て、あなたから1つ提案してください。私が先に指定したら、それに従います。
 2. 案は読みやすい形で見せてください。フォルダ・トーク名・メモ・問いまで具体的に見せます。JSONはまだ出さないでください。直してほしいところを伝えるので、何度でも出し直してください。
 3. 私が「確定」と言ったら（「すぐ確定で」のときも）、下の「出力形式」のJSONを、件数を書いた1行とコードブロック1つだけで出してください。
 - トークが30個を超える大きな構成は、大分類ごとに分けて、1つずつ出してください。
@@ -2562,7 +2567,8 @@ function planMemos(j,rec){
     let kind=isNull(x.kind)?null:String(x.kind).trim();if(kind&&!KIND[kind]){const w=kindWord(kind.toLowerCase());kind=w===undefined?null:w}
     let st=isNull(x.st)?null:String(x.st).trim();if(st&&!STL[st])st={'未確定':'draft','確定':'fixed','完了':'done'}[st]||null;
     if(kind==='task'&&st==='fixed')st='draft';
-    return {text:String(x.text).trim(),kind,st,tags:[...new Set((Array.isArray(x.tags)?x.tags:[]).map(mapT).filter(Boolean))].slice(0,5)}};
+    const src=[...new Set((Array.isArray(x.from)?x.from:x.from?[x.from]:[]).map(id=>{id=String(id??'').replace(/[\[\]\s]/g,'');const mid=rec&&rec.refs&&rec.refs[id];return mid&&S.msgs.has(mid)?mid:null}).filter(Boolean))];
+    return {src,text:String(x.text).trim(),kind,st,tags:[...new Set((Array.isArray(x.tags)?x.tags:[]).map(mapT).filter(Boolean))].slice(0,5)}};
   const mkRoom_=(r,top)=>{
     const hasIn=r&&!isNull(r.in),hasInto=r&&!isNull(r.into);
     if(hasIn&&hasInto)throw new Error(`「in」と「into」は同じ項目に付けられません（${tt(r.title||r.into,30)}）。新しいトークを既存フォルダに作るなら in、既存のトークに足すなら into のどちらか1つです`);
@@ -2621,7 +2627,7 @@ function planMemos(j,rec){
       const use=new Map();items.forEach((x,i)=>{if(picked&&!picked[i])return;const u=use.get(x.ri)||{m:[],q:false};x.m?u.m.push(x.m):u.q=true;use.set(x.ri,u)});
       if(!use.size)return {nodes:[],roots:[],msgs:[]};
       let ci=0;
-      const addMemos=(roomId,list)=>list.forEach((m,k)=>{const o={id:uid(),roomId,text:m.text,images:[],createdAt:t+k,exportedAt:null,exportId:null,importId:iid,tags:m.tags};
+      const addMemos=(roomId,list)=>list.forEach((m,k)=>{const o={id:uid(),roomId,text:m.text,images:[],createdAt:t+k,exportedAt:null,exportId:null,importId:iid,tags:m.tags};if(m.src&&m.src.length)o.src=m.src;
         if(m.kind){o.kind=m.kind;o.kindBy='ai'}if(m.st)o.st=m.st;msgs.push(o)});
       const ok=n=>n.k==='f'?n.ch.some(ok):use.has(n.ri);
       const build=(list,parent,top)=>{const made=[];const ready=list.filter(ok);
