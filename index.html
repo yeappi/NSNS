@@ -507,6 +507,14 @@ body:has(.backdrop) #toast{bottom:auto;top:calc(14px + env(safe-area-inset-top,0
 .pk input{margin-top:3px;flex:none;width:18px;height:18px;accent-color:var(--accent)}.pk small{color:var(--sub)}
 .pk:has(input:not(:checked)){opacity:.45}
 .warn{color:#C9583F}.imprec{font-size:12px;color:#4A5590;margin-bottom:6px}
+.bub.tbl{max-width:100%;white-space:normal}.mtt{font-weight:600;margin-bottom:6px}.mtw{overflow-x:auto;max-width:calc(100vw - 110px)}
+.mtbl{border-collapse:collapse;font-size:12.5px;background:rgba(255,255,255,.7);border-radius:8px}.mtbl th,.mtbl td{border:1px solid rgba(0,0,0,.08);padding:4px 8px;text-align:left;white-space:nowrap}.mtbl th{background:rgba(255,255,255,.9);font-weight:600}
+.extab{margin-left:auto;margin-right:8px}
+.tpls{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.tpl{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow);text-align:left;width:100%}
+.tpl:disabled{opacity:.45}.tpl .ic{font-size:22px;flex:none;width:28px;text-align:center}.tpl .t{flex:1;min-width:0;font-size:15px;font-weight:500}
+.tpl .t small{display:block;font-size:11.5px;color:var(--sub);font-weight:400;margin-top:1px}.tpl .n{flex:none;font-size:12px;background:var(--accent-soft);color:var(--accent-ink);border-radius:9px;padding:2px 9px;font-weight:600}
+#exSimple{padding:0 2px 20px}
 .dvfixed{flex:none;padding:0 12px;max-height:46vh;overflow-y:auto;border-bottom:1px solid var(--line)}
 .dvfixed .dvf{margin:6px 0}
 .dvq{margin:0!important}
@@ -925,6 +933,7 @@ function msgChips(m,noKind){
   if((m.tags||[]).length)p.push(`<span class="at">${m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`);
   return p.join('');
 }
+function tableHTML(m){const t=m.table;return `<div class="mtt">📊 ${esc(t.title||'')}</div><div class="mtw"><table class="mtbl"><thead><tr>${t.columns.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${t.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
 function linkify(t){let s=esc(t);s=s.replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');return s.replace(HT_RE,m=>`<span class="ht">${m}</span>`)}
 function renderChat(toBottom){
   const c=$('#chat');if(!c)return;const all=roomMsgs(S.roomId);
@@ -948,7 +957,7 @@ function renderChat(toBottom){
     const imgs=n?`<div class="imgs ${n===1?'n1':n===2?'n2':n===3?'n3':n===4?'n4':'nmany'}">${m.images.map(b=>`<img data-blob="${b}" data-act="viewImg" alt="">`).join('')}</div>`:'';
     html+=`<div class="msg${S.sel&&S.sel.has(m.id)?' sel':''}" data-act="tapMsg" data-id="${m.id}" data-lpm="${m.id}">
       <div class="swact"><button data-act="msgAnn" data-id="${m.id}"><span>📢</span>${m.pinned?'外す':'アナウンス'}</button><button data-act="msgRoom" data-id="${m.id}"><span>💬</span>トークにする</button></div>
-      <div class="line"><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button><div class="bub${m.exportedAt?' done':''}${n&&!m.text?' onlyimg':''}">${m.kind&&KIND[m.kind]?`<span class="kbadge" title="${KIND[m.kind].label}">${KIND[m.kind].ic}</span>`:''}${imgs}${m.text?linkify(m.text):''}</div></div>
+      <div class="line"><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button><div class="bub${m.exportedAt?' done':''}${n&&!m.text?' onlyimg':''}${m.table?' tbl':''}">${m.kind&&KIND[m.kind]&&!m.table?`<span class="kbadge" title="${KIND[m.kind].label}">${KIND[m.kind].ic}</span>`:''}${imgs}${m.table?tableHTML(m):m.text?linkify(m.text):''}</div></div>
       ${showMeta?`<div class="meta">${chips}${m.exportedAt?'<span class="done">✓ 書き出し済</span>':''}<span>${hm(m.createdAt)}</span></div>`:''}</div>`;
     if(m.aizuchi)html+=`<div class="reply"><div class="rbub">${esc(m.aizuchi)}</div></div>`;
   });
@@ -1120,7 +1129,7 @@ function nodeMenu(id){
     n.type==='room'&&S.roomId===n.id?{icon:'☑',label:'まとめて選択',sub:'メモを選んで分類・書き出し・移動',fn:()=>selStart()}:null,
     {icon:'✎',label:'名前・アイコン・タグを編集',fn:()=>editNodeSheet(n)},
     {icon:'↗',label:'ここから書き出す',fn:()=>openExport({scope:[n.id]})},
-    {icon:'🤖',label:'AIで整理する',sub:'分類・次の問い・資料化',fn:()=>aiNodeMenu(n)},
+    {icon:'🤖',label:'AIに頼む・書き出す',sub:'分類・分解・データ化・資料化・ブレストなど',fn:()=>aiNodeMenu(n)},
     !n.docs&&!ib?{icon:'🗄',label:n.archived?'アーカイブから戻す':'アーカイブする',sub:n.archived?'':(n.type==='folder'?'中のトークごと、アーカイブ帯にしまう':'アーカイブ帯にしまう。検索には出ます'),fn:()=>setArchived([n],!n.archived)}:null,
     ib?null:{icon:'⇢',label:'移動する',fn:()=>moveSheet(n)},
     n.type==='room'?{icon:n.badge?'○':'●',label:n.badge?'バッジを出さない':'未書き出しバッジを出す',fn:async()=>{n.badge=!n.badge;await saveNode(n);renderList()}}:null,
@@ -1380,13 +1389,46 @@ function historySheet(){
     ])});
 }
 
-/* export sheet */
+/* export sheet：何を（条件）→ どう渡す（そのまま／AIに頼む）→ レベル → 出力。シンプル（テンプレート）と詳細のタブ */
 let EXrefresh=null;
-function openExport({scope,ids}={}){
+const HOWS=[['raw','そのまま','📋','原文をそのままコピー・保存'],['classify','分類','🏷','種類・状態・タグを付けてもらう'],['split','分解','✂️','1件に混ざった話題を、1件1話題に分ける'],['data','データ化','📊','日付・金額などを項目に揃えた表にする'],['digest','資料化','📎','結論・疑問・次にやることにまとめる'],['brainstorm','ブレスト','🧠','論点ごとにトークを作り、問いを立てる'],['next','次の問い','❓','書いた答えを踏まえて深掘りの問い'],['think','AI思考法','🧭','合う思考法と、専用の問い']];
+const HOWB=Object.fromEntries(HOWS.map(h=>[h[0],h]));
+const HOW_LV=new Set(['split','data','digest']);
+const H_DEF={how:'raw',lv:'keep',tlv:2};
+let H=Object.assign({},H_DEF,LS.get('exHow',{}));
+const TPL_DEF=[
+ {id:'t:raw',ic:'📋',name:'そのままコピー',H:{how:'raw'}},
+ {id:'t:cls',ic:'🏷',name:'未分類を分類',H:{how:'classify'},F:{status:'all',expr:'@未分類'}},
+ {id:'t:split',ic:'✂️',name:'話題ごとに分解',H:{how:'split',lv:'keep'},F:{status:'all'}},
+ {id:'t:data',ic:'📊',name:'表にする',H:{how:'data',lv:'tidy'},F:{status:'all'}},
+ {id:'t:digest',ic:'📎',name:'資料にまとめる',H:{how:'digest',lv:'sum'},F:{status:'all'}},
+ {id:'t:bs',ic:'🧠',name:'ブレスト',H:{how:'brainstorm'},F:{status:'all'}},
+];
+const howText=h=>{const b=HOWB[h.how]||HOWB.raw;return b[1]+(HOW_LV.has(h.how)?'・'+LV_NAME[h.lv||'keep']:h.how==='think'?`・レベル${h.tlv||2}`:'')};
+const userTpls=()=>[...S.presets.values()].sort((a,b)=>a.createdAt-b.createdAt).map(p=>({id:p.id,user:true,ic:(HOWB[(p.H||{}).how]||HOWB.raw)[2],name:p.name,H:p.H||{how:'raw'},F:p.useF===false?null:p.F,full:p.useF!==false,O:p.O}));
+function tplList(t){const keep=F;
+  try{if(t.full&&t.F&&!FIX){F=clone(t.F);F.scope=(F.scope||[]).filter(id=>S.nodes.has(id))}else if(t.F&&!t.full)F=Object.assign(clone(F),t.F);
+    let l=collect().list;
+    if(FIX&&t.F&&t.F.expr){try{const ex=parseExpr(t.F.expr);l=l.filter(m=>{m._tags=msgTags(m);return ex(m)})}catch(e){}}
+    if(t.H&&t.H.how!=='raw')l=l.filter(m=>m.by!=='ai');
+    return l}finally{F=keep}}
+function exAI(h,list){
+  const rooms=()=>[...new Set(list.map(m=>m.roomId))].map(id=>S.nodes.get(id)).filter(r=>r&&r.type==='room'&&!r.docs);
+  switch(h.how){
+    case 'classify':case 'brainstorm':copyPrompt(h.how,{msgs:list});break;
+    case 'split':case 'data':copyPrompt(h.how,{msgs:list,lv:h.lv||'keep'});break;
+    case 'digest':copyPrompt('digest',{msgs:list,lv:h.lv||'sum'});break;
+    case 'next':copyPrompt('next',{rooms:rooms()});break;
+    case 'think':copyPrompt('think',{rooms:rooms(),level:h.tlv||2});break;
+  }
+}
+function openExport({scope,ids,tab}={}){
   FIX=ids?[...ids]:null;
   if(!FIX){const keep=F;F=newF(scope||[]);F.status=keep.status||'new';PRESET=null}
-  const sh=openSheet(`<div class="shead"><h3>書き出す</h3><button data-e="history">履歴</button></div>
-  <div class="ex">
+  let TAB=tab||LS.get('exTab','simple');
+  const sh=openSheet(`<div class="shead"><h3>書き出す</h3><div class="seg mini extab"><button data-e="tab" data-v="simple">シンプル</button><button data-e="tab" data-v="detail">詳細</button></div><button data-e="history">履歴</button></div>
+  <div id="exSimple"></div>
+  <div class="ex" id="exDetail">
     <div>
       ${FIX?`<div class="card"><div class="scope"><span class="nm">選んだメモ <b>${FIX.length}</b> 件</span></div></div>`:`
       <div class="presets" id="exPresets"></div>
@@ -1400,6 +1442,8 @@ function openExport({scope,ids}={}){
         <div class="hint">スペース＝かつ／or＝または／-＝除く／( )でまとめる。ことばは本文検索。<br>@画像・@済・@未、@タスク・@アイデア・@疑問…・@未分類、@確定・@未確定・@完了、@ピン も使えます。上のタグ選択と組み合わせて効きます。</div>
         <div class="flabel" style="margin-top:12px">期間</div><div class="dates"><input type="date" id="exFrom"><span>〜</span><input type="date" id="exTo"></div>
       </div></details>`}
+      <div class="card"><div class="ctitle">どう渡す</div><div class="chips" id="exHow"></div><div class="hint" id="exHowD" style="margin-top:6px"></div>
+        <div id="exLvW"><div class="flabel" style="margin-top:10px">レベル</div><div class="seg" id="exLv"></div></div></div>
       <details class="adv" id="exFmt"><summary>出力の形式<span class="cur" id="exFmtCur"></span></summary><div class="in">
         <div class="flabel">含める情報</div><div class="chips" id="exInc"></div>
         <div class="flabel" style="margin-top:12px">まとめ方</div><div class="seg" id="exMode"><button data-e="mode" data-v="group">トークごと</button><button data-e="mode" data-v="flat">時系列で1本に</button></div>
@@ -1411,13 +1455,14 @@ function openExport({scope,ids}={}){
     <div class="note hidden" id="exImgNote">コピーでは画像は［画像001］という目印になります。画像ごと渡すなら「保存」から .zip を選んでください。</div>
     ${inFrame&&!DL?'<div class="note">この表示ではファイル保存がブロックされることがあります。HTMLファイルを直接開けば保存できます。</div>':''}
     <div class="markrow" id="exMark" data-e="mark"><span class="ck">✓</span>書き出したら「済み」の印をつける（履歴から取り消せます）</div>
-    <div class="row"><button class="btn pri" data-e="copy">コピー<span class="cnt" id="exCnt1"></span></button><button class="btn" data-e="file">保存<span class="cnt" id="exCnt2"></span></button></div>
+    <div class="row" id="exRawBtns"><button class="btn pri" data-e="copy">コピー<span class="cnt" id="exCnt1"></span></button><button class="btn" data-e="file">保存<span class="cnt" id="exCnt2"></span></button></div>
+    <div class="row hidden" id="exAiBtns"><button class="btn pri" data-e="ai">🤖 プロンプトをコピー<span class="cnt" id="exCnt3"></span></button></div>
   </div>`,{full:true});
 
   let cur={list:[]};
   const q=s=>sh.querySelector(s);
   const drawPresets=()=>{const el=q('#exPresets');if(!el)return;const ps=[...S.presets.values()].sort((a,b)=>a.createdAt-b.createdAt);
-    el.innerHTML=ps.map(p=>`<span class="chip ${PRESET===p.id&&JSON.stringify(p.F)===JSON.stringify(F)?'in':''}" data-e="preset" data-v="${p.id}">★ ${esc(p.name)}</span>`).join('')+`<span class="chip add" data-e="presetSave">＋ この条件を保存</span>`;
+    el.innerHTML=ps.map(p=>`<span class="chip ${PRESET===p.id?'in':''}" data-e="preset" data-v="${p.id}">★ ${esc(p.name)}</span>`).join('')+`<span class="chip add" data-e="presetSave">＋ テンプレートとして保存</span>`;
     el.classList.toggle('hidden',false)};
   const drawTags=()=>{const el=q('#exTags');if(!el)return;
     const cnt=new Map();scopeMsgs().forEach(m=>m._tags.forEach(t=>cnt.set(t,(cnt.get(t)||0)+1)));
@@ -1432,7 +1477,22 @@ function openExport({scope,ids}={}){
     q('#exFmtCur').textContent=Object.keys(L).filter(k=>O.inc[k]).map(k=>L[k]).join('・')+'／'+(O.mode==='group'?'トークごと':'時系列')};
   const drawAdv=()=>{if(!q('#exExpr'))return;q('#exExpr').value=F.expr;q('#exFrom').value=F.from;q('#exTo').value=F.to;
     const parts=[F.expr,(F.from||F.to)?`${F.from||'…'}〜${F.to||'…'}`:''].filter(Boolean);q('#exAdvCur').textContent=parts.join('　');if(parts.length)q('#exAdv').open=true};
-  const drawAll=()=>{if(q('#exScope'))q('#exScope').textContent=scopeLabel();drawPresets();drawTags();drawStatus();drawInc();drawAdv();q('#exMark').classList.toggle('on',!!O.mark);refresh()};
+  const drawHow=()=>{q('#exHow').innerHTML=HOWS.map(([k,l,ic])=>`<span class="chip ${H.how===k?'in':''}" data-e="how" data-v="${k}">${ic} ${l}</span>`).join('');
+    q('#exHowD').textContent=HOWB[H.how][3]+(H.how==='raw'?'':'。プロンプトをコピーして自分のAIに貼り、返ってきたJSONを取り込みます');
+    const lvOn=HOW_LV.has(H.how)||H.how==='think';q('#exLvW').classList.toggle('hidden',!lvOn);
+    q('#exLv').innerHTML=H.how==='think'?THINK_LV.map(([n,d])=>`<button class="${(H.tlv||2)===n?'on':''}" data-e="tlv" data-v="${n}" title="${esc(d)}">${n}</button>`).join('')
+      :Object.entries(LV_NAME).map(([k,l])=>`<button class="${(H.lv||'keep')===k?'on':''}" data-e="lv" data-v="${k}">${l}</button>`).join('');
+    const ai=H.how!=='raw';q('#exRawBtns').classList.toggle('hidden',ai);q('#exAiBtns').classList.toggle('hidden',!ai);q('#exMark').classList.toggle('hidden',ai);q('#exFmt').classList.toggle('hidden',ai);
+    LS.set('exHow',H)};
+  const drawSimple=()=>{const el=q('#exSimple');
+    const ts=[...TPL_DEF,...userTpls()];
+    el.innerHTML=`<div class="card"><div class="scope"><span class="nm">${FIX?`選んだメモ <b>${FIX.length}</b> 件`:`範囲：${esc(scopeLabel())}`}</span><button data-e="tab" data-v="detail">条件を変える</button></div></div>
+      <div class="tpls">${ts.map(t=>{const n=tplList(t).length;return `<button class="tpl" data-e="tpl" data-v="${esc(t.id)}" ${n?'':'disabled'}><span class="ic">${t.ic}</span><span class="t">${t.user?'★ ':''}${esc(t.name)}<small>${esc(howText(t.H))}${t.user&&t.full?'・条件つき':''}</small></span><span class="n">${n}</span></button>`}).join('')}</div>
+      <div class="hint" style="margin:10px 4px">数字は渡すメモの件数。自分用のテンプレートは「詳細」で作れます（長押しで削除）。</div>`};
+  const drawTab=()=>{sh.querySelectorAll('.extab button').forEach(b=>b.classList.toggle('on',b.dataset.v===TAB));
+    q('#exSimple').classList.toggle('hidden',TAB!=='simple');q('#exDetail').classList.toggle('hidden',TAB!=='detail');sh.querySelector('.exbar').classList.toggle('hidden',TAB!=='detail');
+    if(TAB==='simple')drawSimple();LS.set('exTab',TAB)};
+  const drawAll=()=>{if(q('#exScope'))q('#exScope').textContent=scopeLabel();drawPresets();drawTags();drawStatus();drawInc();drawAdv();drawHow();q('#exMark').classList.toggle('on',!!O.mark);refresh();drawTab()};
   const refresh=()=>{
     LS.set('out',O);
     cur=collect();
@@ -1441,18 +1501,29 @@ function openExport({scope,ids}={}){
     q('#exStat').innerHTML=`<b>${cur.list.length}</b>件${imgN?`　画像 ${imgN}枚`:''}`;
     const txt=cur.list.length?blocksToText(buildBlocks(cur.list),'ph'):(cur.err?'（条件の書き方を確認してください）':'（条件に合うメモがありません）');
     q('#exPrev').textContent=txt.length>8000?txt.slice(0,8000)+'\n…':txt;
-    q('#exCnt1').textContent=q('#exCnt2').textContent=cur.list.length?`（${cur.list.length}件）`:'';
-    sh.querySelectorAll('[data-e=copy],[data-e=file]').forEach(b=>b.disabled=!cur.list.length);
+    const aiN=cur.list.filter(m=>m.by!=='ai').length;
+    q('#exCnt1').textContent=q('#exCnt2').textContent=cur.list.length?`（${cur.list.length}件）`:'';q('#exCnt3').textContent=aiN?`（${aiN}件）`:'';
+    sh.querySelectorAll('[data-e=copy],[data-e=file]').forEach(b=>b.disabled=!cur.list.length);q('[data-e=ai]').disabled=!aiN;
     q('#exImgNote').classList.toggle('hidden',!imgN);
     const pe=q('#exPresets');if(pe)drawPresets();
   };
-  EXrefresh=()=>{if(sh.isConnected)refresh()};
+  EXrefresh=()=>{if(sh.isConnected){refresh();if(TAB==='simple')drawSimple()}};
 
   const after=async(list,kind)=>{await recordExport(list,kind);if(FIX&&S.sel){S.sel=null;renderRoom(true)}if(sh.isConnected){if(FIX)closeSheet(sh.parentElement);else{drawTags();refresh()}}};
   sh.addEventListener('click',async e=>{
     const el=e.target.closest('[data-e]');if(!el)return;const v=el.dataset.v;
     switch(el.dataset.e){
       case 'history':historySheet();break;
+      case 'tab':TAB=v;drawTab();break;
+      case 'how':H.how=v;drawHow();refresh();break;
+      case 'lv':H.lv=v;drawHow();break;
+      case 'tlv':H.tlv=+v;drawHow();break;
+      case 'ai':{const l=cur.list.filter(m=>m.by!=='ai');if(!l.length)break;closeSheet(sh.parentElement);exAI(H,l);break}
+      case 'tpl':{const t=[...TPL_DEF,...userTpls()].find(x=>x.id===v);if(!t)break;const l=tplList(t);if(!l.length)break;
+        if(t.H.how==='raw'){const o=t.O?{inc:Object.assign({},O.inc,t.O.inc),mode:t.O.mode||O.mode}:O;
+          if(await copyText(blocksToText(buildBlocks(l,o),'ph'),true)){if(!O.mark)toast('コピーしました');await recordExport(l,'コピー');closeSheet(sh.parentElement)}}
+        else{closeSheet(sh.parentElement);exAI(t.H,l)}
+        break}
       case 'scope':scopeSheet(()=>{q('#exScope').textContent=scopeLabel();drawTags();refresh()});break;
       case 'tmode':O.tagMode=v;drawTags();refresh();break;
       case 'tag':{if(F.tagIn.includes(v)){F.tagIn=F.tagIn.filter(t=>t!==v);F.tagOut.push(v)}else if(F.tagOut.includes(v))F.tagOut=F.tagOut.filter(t=>t!==v);else F.tagIn.push(v);drawTags();refresh();break}
@@ -1460,8 +1531,8 @@ function openExport({scope,ids}={}){
       case 'inc':O.inc[v]=!O.inc[v];drawInc();refresh();break;
       case 'mode':O.mode=v;drawInc();refresh();break;
       case 'mark':O.mark=!O.mark;q('#exMark').classList.toggle('on',O.mark);LS.set('out',O);break;
-      case 'preset':{const p=S.presets.get(v);if(!p)break;F=clone(p.F);F.scope=F.scope.filter(id=>S.nodes.has(id));if(p.O){O.inc=Object.assign({},O.inc,p.O.inc);O.mode=p.O.mode||O.mode;O.tagMode=p.O.tagMode||O.tagMode}PRESET=p.id;drawAll();toast(`「${p.name}」を適用しました`);break}
-      case 'presetSave':{const name=await promptSheet('この条件に名前をつける','','例：AIに渡す用','保存');if(!name)break;const p={id:uid(),name,F:clone(F),O:{inc:clone(O.inc),mode:O.mode,tagMode:O.tagMode},createdAt:now()};S.presets.set(p.id,p);await DB.put('presets',p);PRESET=p.id;drawPresets();toast('保存しました。長押しで削除できます');break}
+      case 'preset':{const p=S.presets.get(v);if(!p)break;if(p.useF!==false&&p.F&&!FIX){F=clone(p.F);F.scope=F.scope.filter(id=>S.nodes.has(id))}if(p.O){O.inc=Object.assign({},O.inc,p.O.inc);O.mode=p.O.mode||O.mode;O.tagMode=p.O.tagMode||O.tagMode}if(p.H)H=Object.assign({},H_DEF,p.H);PRESET=p.id;drawAll();toast(`「${p.name}」を適用しました`);break}
+      case 'presetSave':{const r=await tplSaveSheet();if(!r)break;const p={id:uid(),name:r.name,F:clone(F),useF:r.useF&&!FIX,O:{inc:clone(O.inc),mode:O.mode,tagMode:O.tagMode},H:clone(H),createdAt:now()};S.presets.set(p.id,p);await DB.put('presets',p);PRESET=p.id;drawPresets();toast('テンプレートにしました。「シンプル」に並びます');break}
       case 'copy':{const list=cur.list;if(!list.length)break;if(await copyText(blocksToText(buildBlocks(list),'ph'),true)){if(!O.mark)toast('コピーしました');await after(list,'コピー')}break}
       case 'file':{
         const list=cur.list;if(!list.length)break;const hasImg=O.inc.images&&list.some(m=>(m.images||[]).length);
@@ -1479,6 +1550,11 @@ function openExport({scope,ids}={}){
     }
   });
   // preset long-press / right-click → delete
+  const sEl=q('#exSimple');{const del=async id=>{const p=S.presets.get(id);if(!p)return;if(!await confirmSheet(`テンプレート「${p.name}」を削除しますか？`,'','削除する',true))return;S.presets.delete(id);await DB.del('presets',id);drawSimple()};
+    sEl.addEventListener('contextmenu',e=>{const c=e.target.closest('[data-e=tpl]');if(c&&S.presets.has(c.dataset.v)){e.preventDefault();del(c.dataset.v)}});
+    let t;sEl.addEventListener('pointerdown',e=>{const c=e.target.closest('[data-e=tpl]');if(!c||!S.presets.has(c.dataset.v))return;t=setTimeout(()=>{t=null;sEl._lp=1;del(c.dataset.v)},550)});
+    ['pointerup','pointerleave','pointercancel'].forEach(ev=>sEl.addEventListener(ev,()=>clearTimeout(t)));
+    sEl.addEventListener('click',e=>{if(sEl._lp){sEl._lp=0;e.stopPropagation();e.preventDefault()}},true)}
   const pEl=q('#exPresets');
   if(pEl){const del=async id=>{const p=S.presets.get(id);if(!p)return;if(!await confirmSheet(`「${p.name}」を削除しますか？`,'','削除する',true))return;S.presets.delete(id);await DB.del('presets',id);if(PRESET===id)PRESET=null;drawPresets()};
     pEl.addEventListener('contextmenu',e=>{const c=e.target.closest('[data-e=preset]');if(c){e.preventDefault();del(c.dataset.v)}});
@@ -1489,6 +1565,17 @@ function openExport({scope,ids}={}){
     q('#exFrom').onchange=e=>{F.from=e.target.value;refresh()};q('#exTo').onchange=e=>{F.to=e.target.value;refresh()}}
   drawAll();
 }
+function tplSaveSheet(){return new Promise(res=>{
+  const sh=openSheet(`<h3>テンプレートとして保存</h3><div class="field"><input class="inp" placeholder="例：仕事を表にする"></div>
+    <div class="swrow" id="tUseF"><div class="t">範囲と条件も覚える<small>オフなら、開いた場所のメモにいつでも使えます</small></div><div class="switch"></div></div>
+    <p class="hint" style="margin:8px 2px 12px">頼み方（${esc(howText(H))}）と出力の形式は、いつも覚えます。</p>
+    <div class="btns"><button class="btn" data-x="no">やめる</button><button class="btn pri" data-x="ok">保存</button></div>`);
+  const inp=sh.querySelector('input');autoFocus(inp,true);let useF=false;const sw=sh.querySelector('#tUseF');
+  sw.onclick=()=>{useF=!useF;sw.querySelector('.switch').classList.toggle('on',useF)};
+  const done=v=>{closeSheet();res(v)};
+  sh.querySelector('[data-x=no]').onclick=()=>done(null);
+  sh.querySelector('[data-x=ok]').onclick=()=>{const n=inp.value.trim();if(!n){toast('名前を入れてください');return}done({name:n,useF})};
+})}
 function scopeSheet(done){
   const sel=new Set(F.scope);
   const draw=sh=>{
@@ -1785,13 +1872,50 @@ ${P_FLOW}
 # トーク（${rooms.length}個）
 ${rooms.map(r=>roomForAI(r,X)).join('\n\n')}
 `,
-  digest:({rooms},X)=>`下の【トーク】の内容を、後から読み返せる「資料」1本にまとめてください。
+  split:({msgs,lv},X)=>`あなたはメモ整理のアシスタントです。下の【メモ】には、1件に複数の話題が混ざっているものがあります。1件＝1話題になるように分けてください。
+
+${P_DIRECT}
+
+# ルール
+- 話題が1つしかないメモは出力しない（分けるメモだけを items に入れる）。
+- parts は分けたあとのメモの配列。元のメモの内容を、漏れなく、どれか1つの part に入れる。
+- 書き方のレベル：${LV_TXT[lv||'keep']}
+- タグ（#〜）は、その話題の part に残す。
+
+# 出力形式
+{"nsns":1,"type":"split","ref":"${X.ref}","items":[{"id":"m1","parts":["1つ目の話題","2つ目の話題"]}]}
+- id は【メモ】の [ ] の中（m1, m2 …）をそのまま使う。ref もそのまま。
+
+# メモ（${msgs.length}件）
+${msgs.map(m=>`[${X.rm(m)}] ${flat(m.text)}`).join('\n')}
+`,
+  data:({msgs,lv},X)=>`あなたはデータ整理のアシスタントです。下の【メモ】から、表にできる情報（日付・金額・数量・人・場所・項目名など）を取り出して、1つの表にしてください。
+
+${P_FLOW}
+（一覧の代わりに、表の列と最初の数行を見せてください）
+
+# ルール
+- 列（columns）は、メモの中身に合わせて3〜7個。いちばん大事な列を左に。
+- 1行＝1件の記録。from にその行の元になったメモの番号を入れる。表にできないメモは入れない。
+- 値が書かれていないセルは空文字 "" にする。推測で埋めない。
+- 書き方のレベル：${LV_TXT[lv||'keep']}
+- title は表の名前を15字以内で。
+
+# 出力形式
+{"nsns":1,"type":"data","ref":"${X.ref}","title":"…","columns":["日付","項目","金額"],"rows":[{"from":"m1","cells":["11/20","電気代","8,400円"]}]}
+- from は【メモ】の [ ] の中（m1, m2 …）。ref はそのまま。
+
+# メモ（${msgs.length}件）
+${msgs.map(m=>`[${X.rm(m)}] ${ymd(m.createdAt)} (${roomLabelForAI(m.roomId)}) ${flat(m.text)}`).join('\n')}
+`,
+  digest:({rooms,msgs,lv},X)=>`下の【トーク】の内容を、後から読み返せる「資料」1本にまとめてください。
 
 ${P_FLOW}
 （一覧の代わりに、まとめの下書きと、アーカイブしてよいトークの名前を見せてください）
 
 # ルール
 - 「結論・決めたこと」「残っている疑問」「次にやること」に分け、箇条書きで書く。
+- 書き方のレベル：${LV_TXT[lv||'sum']}
 - メモにない内容は足さない。AIの問いかけそのものは資料に入れない。
 - archive には、結論が十分に出て、もう書き足さなくてよいトークの id だけを入れる。迷うものは入れない。
 - title は20字以内。本文は lines に1行ずつ入れる（見出しも箇条書きも1行＝1要素）。
@@ -1801,21 +1925,30 @@ ${P_FLOW}
 - archive の id は各トークの見出しの「id:」の後ろ（r1, r2 …）。ref はそのまま。
 
 # トーク（${rooms.length}個）
-${rooms.map(r=>roomForAI(r,X)).join('\n\n')}
+${msgs?rooms.map(r=>{const ms=msgs.filter(m=>m.roomId===r.id);return `## トーク「${r.name}」 id:${X.rr(r)}（選んだ${ms.length}件）\n`+ms.map(m=>'私: '+flat(m.text)).join('\n')}).join('\n\n'):rooms.map(r=>roomForAI(r,X)).join('\n\n')}
 `,
 };
-const AI_LABEL={classify:'分類',brainstorm:'ブレスト',next:'次の問い',questions:'次の問い',digest:'資料化',think:'AI思考法'};
+const AI_LABEL={classify:'分類',brainstorm:'ブレスト',next:'次の問い',questions:'次の問い',digest:'資料化',think:'AI思考法',split:'分解',data:'データ化'};
+/* 原文をどこまで変えてよいか（分解・データ化・資料化） */
+const LV_TXT={
+  keep:'原文を残す：言い換えない。誤字もそのまま。切り分けや並べ替えだけをする。',
+  tidy:'整える：意味は変えずに、誤字・言い回し・表記ゆれを直してよい。足したり削ったりはしない。',
+  sum:'まとめる：要点だけを短く書き直してよい。ただしメモにない事実は足さない。'};
+const LV_NAME={keep:'原文を残す',tidy:'整える',sum:'まとめる'};
 /* 送る：記録を作ってプロンプトをコピー */
 function copyPrompt(type,o){
   if(o.msgs){o.msgs=o.msgs.filter(m=>m&&m.by!=='ai').sort((a,b)=>a.createdAt-b.createdAt);if(!o.msgs.length){toast('渡すメモがありません');return}
     if(type==='brainstorm'&&o.msgs.length>200){o.msgs=o.msgs.slice(-200);hintOnce('aiLimit','多いので新しい200件だけ渡します')}}
   if(o.rooms){o.rooms=o.rooms.filter(r=>r&&!r.docs);if(!o.rooms.length){toast('渡すトークがありません');return}}
   const rec={id:rid4(),type,at:now(),refs:{},label:AI_LABEL[type]};
-  if(type==='classify'){rec.queue=o.msgs.map(m=>m.id);rec.total=rec.queue.length;rec.done=0;return aiSendNext(rec)}
+  if(o.lv)rec.lv=o.lv;
+  if(type==='classify'||type==='split'){rec.queue=o.msgs.map(m=>m.id);rec.total=rec.queue.length;rec.done=0;return aiSendNext(rec)}
+  if(type==='data'){if(o.msgs.length>200){o.msgs=o.msgs.slice(-200);hintOnce('aiLimitD','多いので新しい200件だけ渡します')}rec.place=aiPlace(o.msgs.map(m=>m.roomId))}
   if(type==='brainstorm')rec.place=aiPlace(o.msgs.map(m=>m.roomId));
-  if(type==='digest')rec.folderId=o.folderId||'';
+  if(type==='digest'){if(o.msgs&&!o.rooms)o.rooms=[...new Set(o.msgs.map(m=>m.roomId))].map(id=>S.nodes.get(id)).filter(r=>r&&!r.docs);rec.folderId=o.folderId!==undefined?o.folderId:(aiPlace((o.rooms||[]).map(r=>r.id))||'')}
   if(type==='think'){rec.level=o.level;rec.sent=o.rooms.map(r=>r.id)}
-  if(o.rooms)rec.n=`トーク${o.rooms.length}個`;else rec.n=`メモ${o.msgs.length}件`;
+  if(o.msgs)rec.n=`メモ${o.msgs.length}件`;else rec.n=`トーク${o.rooms.length}個`;
+  if(o.lv)rec.n+=`・${LV_NAME[o.lv]}`;
   aiCopy(rec,PROMPTS[type](o,aiX(rec)));
 }
 function aiX(rec){let mi=0,ri=0;const inv=new Map();
@@ -1829,10 +1962,10 @@ function aiSendNext(rec){
   rec.refs={};rec.cur=take.map(m=>m.id);rec.queue=ids.slice(CHUNK);rec.at=now();
   const part=rec.total>CHUNK?`（${rec.done+1}〜${rec.done+take.length}件目／全${rec.total}件）`:'';
   rec.n=`メモ${take.length}件${part}`;
-  aiCopy(rec,PROMPTS.classify({msgs:take},aiX(rec)));
+  aiCopy(rec,PROMPTS[rec.type]({msgs:take,lv:rec.lv},aiX(rec)));
 }
 function aiCopy(rec,text){
-  if(rec.type!=='classify'&&text.length<300000)rec.text=text;
+  if(rec.type!=='classify'&&rec.type!=='split'&&text.length<300000)rec.text=text;
   aiPutRec(rec);
   copyText(text,true).then(ok=>{if(!ok)return;
     toast(`${rec.label}のプロンプトをコピーしました（${rec.n}）。自分のAIに貼ってください`,'取り込む',()=>importSheet(rec.id));
@@ -1845,7 +1978,7 @@ function aiPendHTML(){const a=aiRecs();if(!a.length)return '';
 function aiPendRefresh(){document.querySelectorAll('.aipendw').forEach(w=>w.innerHTML=aiPendHTML())}
 function aiPendSheet(){const a=aiRecs();if(!a.length)return;
   const sh=openSheet(`<h3>🤖 AIの結果待ち</h3><p class="hint" style="margin:-6px 2px 12px">プロンプトをAIに貼って、返ってきたJSONを取り込みます。</p>
-    <div class="aplist">${a.map(r=>`<div class="ap"><div class="t"><b>${esc(r.label)}</b>　${esc(r.n||'')}<small>${fmtTime(r.at)}にコピー${r.type==='classify'&&r.total>CHUNK?` · ${r.done}/${r.total}件済み`:''}</small></div>
+    <div class="aplist">${a.map(r=>`<div class="ap"><div class="t"><b>${esc(r.label)}</b>　${esc(r.n||'')}<small>${fmtTime(r.at)}にコピー${(r.type==='classify'||r.type==='split')&&r.total>CHUNK?` · ${r.done}/${r.total}件済み`:''}</small></div>
       <div class="b"><button class="btn pri" data-imp="${r.id}">取り込む</button><button class="btn" data-re="${r.id}">もう一度コピー</button><button class="btn" data-del="${r.id}">やめる</button></div></div>`).join('')}</div>
     <div class="btns" style="margin-top:12px"><button class="btn" data-x="no">閉じる</button></div>`);
   sh.querySelector('[data-x=no]').onclick=()=>closeSheet();
@@ -1854,7 +1987,7 @@ function aiPendSheet(){const a=aiRecs();if(!a.length)return;
   sh.querySelectorAll('[data-re]').forEach(b=>b.onclick=()=>{closeSheet();aiRecopy(b.dataset.re)});
 }
 function aiRecopy(id){const rec=aiRec(id);if(!rec)return;
-  if(rec.type==='classify'){rec.queue=[...(rec.cur||[]),...(rec.queue||[])];return aiSendNext(rec)}
+  if(rec.type==='classify'||rec.type==='split'){rec.queue=[...(rec.cur||[]),...(rec.queue||[])];return aiSendNext(rec)}
   if(rec.text){copyText(rec.text,true).then(ok=>{if(ok)toast(`${rec.label}のプロンプトをもう一度コピーしました`)});return}
   toast('このプロンプトはもう一度作れません。元の場所から頼み直してください');
 }
@@ -1914,12 +2047,9 @@ function aiAsk({msgs,rooms,label,fid}){
     {icon:'📥',label:'AIの結果を取り込む',sub:aiRecs().length?`結果待ち ${aiRecs().length}件`:'',fn:()=>importSheet()},
   ]);
 }
-function aiNodeMenu(n){
-  const rooms=n.type==='room'?[n]:descendants(n.id).filter(d=>d.type==='room'&&!d.docs&&!d.archived);
-  const msgs=rooms.flatMap(r=>roomMsgs(r.id));
-  aiAsk({msgs,rooms,label:n.name,fid:n.type==='room'?(n.parentId||''):n.id});
-}
-function aiAskMsgs(msgs,label){const rs=[...new Set(msgs.map(m=>m.roomId))].map(id=>S.nodes.get(id)).filter(Boolean);aiAsk({msgs,rooms:rs.length<=12?rs:[],label})}
+/* 入口は書き出し画面（シンプルタブ）に集約 */
+function aiNodeMenu(n){openExport({scope:[n.id],tab:'simple'})}
+function aiAskMsgs(msgs,label){if(!msgs.length){toast('渡すメモがありません');return}openExport({ids:msgs.map(m=>m.id),tab:'simple'})}
 
 /* ---- 取り込み ---- */
 function fixJSON(s){ // 文字列の中の生の改行・タブを \n \t に直す（AIがよくやる崩れ）
@@ -2069,6 +2199,47 @@ function planThink(j,rec){
         await insertAfter(n,rs,pid);rs.forEach(r=>nodes.push(r.id));open=open||rs[0].id}
       if(rec)aiDropRec(rec.id);return {nodes,roots:nodes,moved,prevRec,open:targets.length===1?(open||targets[0].n.id):null}}};
 }
+/* 続き（分類・分解の80件ずつ）を記録に戻す */
+function aiAfterChunk(rec,gotIds){if(!rec||!rec.cur)return null;const got=new Set(gotIds);const back=(rec.cur||[]).filter(id=>!got.has(id));
+  rec.done=(rec.done||0)+got.size;rec.queue=[...back,...(rec.queue||[])].filter(id=>S.msgs.has(id));rec.cur=[];
+  if(rec.queue.length){rec.n=`続き ${rec.queue.length}件`;aiPutRec(rec);return rec.id}aiDropRec(rec.id);return null}
+function planSplit(j,rec){
+  const R=aiResolver(rec);const ch=[];let miss=0;const seen=new Set();
+  for(const it of (Array.isArray(j.items)?j.items:[])){const m=R.msg(it?.id);const parts=(Array.isArray(it?.parts)?it.parts:[]).map(x=>String(x).trim()).filter(Boolean);
+    if(!m||m.by==='ai'||seen.has(m.id)){miss++;continue}seen.add(m.id);if(parts.length<2)continue;ch.push({m,parts})}
+  const sent=rec&&rec.cur?rec.cur.filter(id=>S.msgs.has(id)).length:0;
+  if(!ch.length&&!sent)throw new Error('分けるメモがありません');
+  return {count:ch.length,
+    pick:ch.map(c=>({on:true,html:`<small>${esc(flat(c.m.text).slice(0,50))}</small><br>${c.parts.map(x=>'・'+esc(x.slice(0,60))).join('<br>')}`})),
+    html:`チェックしたメモを、話題ごとのメモに分けます。分けたメモは元と同じトークの同じ位置に並び、元のメモはごみ箱へ移します（取り消すと戻ります）。${ch.length?'':'<br>分ける必要のあるメモはありませんでした。'}${miss?`<br>見つからないID：${miss}件（スキップ）`:''}`,
+    apply:async(iid,picked)=>{const made=[],olds=[];
+      ch.forEach((c,i)=>{if(picked&&!picked[i])return;const m=c.m;
+        c.parts.forEach((t,k)=>made.push({id:uid(),roomId:m.roomId,text:t,images:k===0?[...(m.images||[])]:[],createdAt:m.createdAt+k,exportedAt:null,exportId:null,tags:m.tags?[...m.tags]:undefined,kind:m.kind,st:m.st,kindBy:m.kindBy,pinned:k===0?m.pinned:undefined,importId:iid,splitFrom:m.id}));
+        olds.push(m)});
+      await saveMsgs(made.map(x=>{Object.keys(x).forEach(k=>x[k]===undefined&&delete x[k]);return x}));
+      const tid=olds.length?await moveToTrash([],olds,new Set()):null;
+      const next=aiAfterChunk(rec,rec&&rec.cur?rec.cur:[]);
+      return {msgs:made.map(x=>x.id),restoreTid:tid,next}}};
+}
+function planData(j,rec){
+  const R=aiResolver(rec);
+  const cols=(Array.isArray(j.columns)?j.columns:[]).map(x=>String(x).trim()).filter(Boolean).slice(0,10);if(!cols.length)throw new Error('列（columns）がありません');
+  const rows=(Array.isArray(j.rows)?j.rows:[]).map(r=>({from:R.msg(r?.from),cells:cols.map((c,i)=>String((Array.isArray(r?.cells)?r.cells:[])[i]??'').trim())})).filter(r=>r.cells.some(Boolean));
+  if(!rows.length)throw new Error('行（rows）がありません');
+  const title=String(j.title||'データ').trim().slice(0,40);
+  let pid=rec&&rec.place!==undefined?rec.place:(S.cwd&&S.nodes.has(S.cwd)?S.cwd:null);if(pid&&!S.nodes.has(pid))pid=null;
+  const where=pid?S.nodes.get(pid).name:'ホーム';
+  return {count:rows.length,
+    pick:rows.map(r=>({on:true,html:r.cells.map(esc).join(' ｜ ')})),
+    html:`「${esc(where)}」の「資料」トークに、表「<b>${esc(title)}</b>」（${cols.map(esc).join('・')}）を入れます。データタブの「資料」にも出ます。`,
+    apply:async(iid,picked)=>{const t=now();const nodes=[];const use=rows.filter((r,i)=>!picked||picked[i]);
+      let docs=kids(pid).find(n=>n.type==='room'&&n.docs);
+      if(!docs){docs={id:uid(),type:'room',parentId:pid,name:'資料',emoji:'📌',color:PALETTE[4],tags:[],badge:false,docs:true,order:nextTopOrder(pid),createdAt:t,lastAt:t,importId:iid};nodes.push(docs.id)}
+      const md=['| '+cols.join(' | ')+' |','| '+cols.map(()=>'---').join(' | ')+' |',...use.map(r=>'| '+r.cells.map(c=>c.replace(/\|/g,'／')).join(' | ')+' |')].join('\n');
+      const m={id:uid(),roomId:docs.id,text:`【${title}】\n${md}`,images:[],createdAt:t,exportedAt:null,exportId:null,kind:'info',kindBy:'ai',aiMade:true,importId:iid,table:{title,columns:cols,rows:use.map(r=>r.cells),from:use.map(r=>r.from?.id||null)}};
+      docs.lastAt=t;await saveNode(docs);await saveMsg(m);if(rec)aiDropRec(rec.id);
+      return {nodes,roots:nodes,msgs:[m.id],open:docs.id}}};
+}
 function makePlan(j,rec){
   switch(j.type){
     case 'classify':return planClassify(j,rec);
@@ -2076,6 +2247,8 @@ function makePlan(j,rec){
     case 'questions':case 'next':return planQuestions(j,rec);
     case 'digest':return planDigest(j,rec);
     case 'think':return planThink(j,rec);
+    case 'split':return planSplit(j,rec);
+    case 'data':return planData(j,rec);
   }
   throw new Error(`知らない種類のJSONです（type: ${j.type}）`);
 }
@@ -2085,6 +2258,7 @@ async function undoImport(id){
   const a=importsLog();const r=a.find(x=>x.id===id);if(!r||r.undone)return;const u=r.undo||{};
   if(u.prev){const ch=[];for(const [mid,[k,st,tags,kb]] of Object.entries(u.prev)){const m=S.msgs.get(mid);if(!m||m.importId!==r.id)continue;m.kind=k;m.st=st;m.tags=tags;m.kindBy=kb;delete m.importId;ch.push(m)}if(ch.length)await saveMsgs(ch)}
   if(u.ibMoved&&u.ibMoved.length)await ibUnarchive(u.ibMoved,u.ibId);
+  if(u.restoreTid)await restoreTrash(u.restoreTid);
   if(u.moved&&u.moved.length){const ns=[];for(const x of u.moved){const n=S.nodes.get(x.id);if(n){n.parentId=x.parentId;n.order=x.order;ns.push(n)}}if(ns.length)await saveNodes(ns)}
   if(u.prevRun){const ns=[];for(const [id,v] of Object.entries(u.prevRun)){const n=S.nodes.get(id);if(n){if(v)n.mrun=v;else delete n.mrun;S.qa.delete(id);ns.push(n)}}if(ns.length)await saveNodes(ns);if(S.roomId)renderRoom(true)}
   if(u.prevRec){const ns=[];for(const [id,v] of Object.entries(u.prevRec)){const n=S.nodes.get(id);if(n){if(v)n.rec=v;else delete n.rec;ns.push(n)}}if(ns.length)await saveNodes(ns)}
@@ -2530,7 +2704,7 @@ function dvFilterHTML(v){
 function dvBubHTML(m){
   const ai=m.by==='ai';const D=S.dv;const sel=D.sel&&D.sel.has(m.id);
   const meta=ai?'':[m.pinned?'<span>📢</span>':'',m.st&&STL[m.st]?`<span class="sc ${m.st}">${STL[m.st]}</span>`:'',(m.tags||[]).length?`<span class="at">${m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`:'',m.fromView?'<span>🗃</span>':''].join('');
-  return `<div class="dvm${ai?' ai':''}${sel?' sel':''}${m.st==='done'?' fin':''}" data-act="dv" data-d="tapm" data-id="${m.id}">${D.sel?'<span class="dvck"></span>':''}<div class="bub${ai?' ai':''}${m.exportedAt?' done':''}">${!ai&&m.kind&&KIND[m.kind]?`<span class="kbadge">${KIND[m.kind].ic}</span>`:''}${m.text?linkify(m.text):'📷 画像'}</div>${ai?'':`<div class="meta">${meta}<span>${hm(m.createdAt)}</span></div>`}</div>`;
+  return `<div class="dvm${ai?' ai':''}${sel?' sel':''}${m.st==='done'?' fin':''}" data-act="dv" data-d="tapm" data-id="${m.id}">${D.sel?'<span class="dvck"></span>':''}<div class="bub${ai?' ai':''}${m.exportedAt?' done':''}">${!ai&&m.kind&&KIND[m.kind]?`<span class="kbadge">${KIND[m.kind].ic}</span>`:''}${m.table?tableHTML(m):m.text?linkify(m.text):'📷 画像'}</div>${ai?'':`<div class="meta">${meta}<span>${hm(m.createdAt)}</span></div>`}</div>`;
 }
 /* ビューの条件から、書いたメモに付ける印を決める（決まらないものは付けない） */
 function dvMarks(v,gv){
