@@ -2433,7 +2433,7 @@ function dvAct(el,e){
   switch(d){
     case 'open':{const id=el.dataset.id;const sv=id.startsWith('p:')?DV_PRESETS.find(x=>x.id===id):dvSaved().find(x=>x.id===id);if(!sv)break;
       D.v=clone(sv);D.v.f=dvF(D.v.f);if(sv.gv!=null){D.gv=sv.gv;D.mode='room'}else{D.gv=null;D.mode='groups'}
-      if(id.startsWith('p:')&&D.v.group==='none'){D.mode='room';D.gv=null}renderList();break}
+      if(D.v.group==='none'){D.mode='room';D.gv=null}D.draft='';D.showF=false;renderList();break}
     case 'room':D.gv=el.dataset.v;D.mode='room';D.draft='';D.showF=false;renderList();break;
     case 'back':if(D.mode==='room'&&D.v.group!=='none'&&!(D.v.gv!=null)){D.mode='groups';D.gv=null}else{D.mode='home';D.v=null;D.gv=null}renderList();break;
     case 'group':if(v){detach();v.group=el.dataset.v;if(v.group==='digest')v.f.docsOnly=true;else if(v.f.docsOnly&&!(v.id&&v.id.startsWith('p:digest')))v.f.docsOnly=false;D.gv=null;D.mode=v.group==='none'?'room':'groups';touchF()}break;
@@ -2512,9 +2512,45 @@ async function seedTest(){
   msg(r7,'【旅行の準備のまとめ】\n・持ち物：充電器、常備薬\n・予約：ホテルは済み、レンタカーはまだ',{kind:'info',kindBy:'ai',aiMade:true});
   const r8=node({type:'room',parentId:top.id,name:'旅行の準備（済み）',archived:true});
   msg(r8,'ホテル予約した');msg(r8,'レンタカーも予約した');
+  // 7b) ビューを試すための、日付・種類・状態・タグがばらけたメモ
+  const ago=(d,h=10)=>t-d*D-(24-h)*H%D; // d日前のだいたいの時刻
+  const w=node({type:'room',parentId:top.id,name:'仕事のメモ',tags:['仕事'],emoji:'💼'});
+  [[1,'見積書を送る',{kind:'task',st:'draft'}],[2,'クライアントAの修正依頼を確認する',{kind:'task',st:'fixed'}],[3,'請求書を発行した',{kind:'task',st:'done'}],
+   [5,'打ち合わせで「納期より品質」と言われた',{kind:'log'}],[6,'料金表をシンプルにしたらどうか',{kind:'idea'}],[8,'競合の価格はいくら？',{kind:'question'}],
+   [9,'来月の予算のスプレッドシート #お金',{kind:'info',st:'fixed'}],[12,'断るのが下手で、また引き受けてしまった',{kind:'feeling'}],
+   [15,'週1で振り返りの時間を取る',{kind:'task',st:'done'}],[20,'リピートしてくれる人の共通点を調べる',{kind:'idea',st:'draft'}],[34,'前期の売上メモ',{kind:'info'}]]
+   .forEach(([d,tx,o])=>msg(w,tx,Object.assign({at:ago(d),kindBy:'me'},o)));
+  const th=node({type:'room',parentId:top.id,name:'考えごと',tags:['思考']});
+  [[0,'なぜ続かないのかを一回ちゃんと考えたい',{kind:'question'}],[1,'小さく始めるのは大事だと思う #習慣',{kind:'idea'}],[2,'寝る前のスマホをやめられない',{kind:'feeling',tags:['習慣']}],
+   [4,'習慣は「きっかけ→行動→ごほうび」だと本で読んだ #習慣',{kind:'info'}],[7,'朝の散歩を3日続けられた',{kind:'log'}],[10,'ごほうびを先に置いたらどうなる？',{kind:'question'}],
+   [14,'ゲームみたいに連続日数を数えたら続くかも #習慣',{kind:'idea',st:'draft'}],[25,'友達に話したら「意外とできてる」と言われた',{kind:'log'}],[40,'やる気がないと決めつけるのはやめたい',{kind:'feeling'}]]
+   .forEach(([d,tx,o])=>msg(th,tx,Object.assign({at:ago(d,20),kindBy:'ai'},o)));
+  const life=node({type:'room',parentId:top.id,name:'暮らし',emoji:'🏠'});
+  [[0,'洗剤を買う',{kind:'task',st:'draft'}],[1,'電気代の請求が高かった #お金',{kind:'log'}],[3,'燃えるゴミは月・木',{kind:'info',st:'fixed'}],[6,'引っ越し先の候補をまとめたい',{kind:'task',st:'draft'}],
+   [11,'部屋が片付くと気持ちも軽い',{kind:'feeling'}],[18,'冷蔵庫の中を一度ぜんぶ出す',{kind:'task',st:'done'}],[45,'前の部屋の退去費用',{kind:'info',tags:['お金']}]]
+   .forEach(([d,tx,o])=>msg(life,tx,Object.assign({at:ago(d,18),kindBy:'me'},o)));
+  // 資料：月をまたいで
+  [[62,'【9月の振り返り】\n・新しいアプリの試作を始めた\n・毎日の記録は2週間で止まった'],[33,'【10月の振り返り】\n・記録は「1行だけ」なら続いた\n・料金表を見直した'],[6,'【11月前半のまとめ】\n・ビューで横断して見る形にした']]
+   .forEach(([d,tx])=>msg(r7,tx,{kind:'info',kindBy:'ai',aiMade:true,at:ago(d,12)}));
+  // アーカイブしたフォルダ
+  const fa=node({type:'folder',parentId:top.id,name:'去年の旅行（済み）',emoji:'🧳',archived:true});
+  const fr=node({type:'room',parentId:fa.id,name:'京都メモ'});
+  msg(fr,'清水寺は朝いちが空いてる',{kind:'info',at:ago(300)});msg(fr,'帰りの新幹線で寝落ちした',{kind:'log',at:ago(299)});
   // 8) inbox（まだ無いときだけ）
   let ib=getInbox();const newInbox=!ib;
-  if(newInbox){ib=await ensureInbox();msg(ib,'今、頭を占めてることは？',{by:'ai',qid:1,at:t-2*H});msg(ib,'来週のプレゼンの構成',{at:t-2*H+1000});msg(ib,'牛乳買う',{at:t-H})}
+  if(newInbox){ib=await ensureInbox();msg(ib,'今、頭を占めてることは？',{by:'ai',qid:1,at:t-2*H});msg(ib,'来週のプレゼンの構成',{at:t-2*H+1000});msg(ib,'牛乳買う',{at:t-H});msg(ib,'さっきの打ち合わせ、結論が曖昧だった',{at:t-30*60000});msg(ib,'なんとなく不安',{at:t-10*60000})}
+  // アーカイブinbox：整理済みのメモ（inboxから移ったもの・ビューから書いたもの）
+  const ia=await ensureIbArch();
+  const am=(tx,d,o)=>{const at=ago(d,15);const m=Object.assign({id:uid(),roomId:ia.id,text:tx,images:[],createdAt:at,exportedAt:null,exportId:null,kindBy:'me'},o);M.push(m);ia.lastAt=Math.max(ia.lastAt||0,at)};
+  am('友達に誕生日プレゼントを送る',1,{kind:'task',st:'draft'});am('昼のランチ、思ったより高かった #お金',4,{kind:'log'});
+  am('もっと短く書ける気がする',9,{kind:'idea'});am('ビューから書いたメモの例：アプリ名は短いほうがいい',2,{kind:'idea',fromView:true});
+  am('毎日の記録、1行ならできそう',13,{kind:'feeling',tags:['習慣']});am('この日は何もできなかった',22,{kind:'feeling'});
+  await saveNode(ia);
+  // 保存済みビューの例（まだ1つも無いときだけ）
+  if(!LS.get('views',[]).length)LS.set('views',[
+    {id:uid(),name:'仕事の未完了',group:'none',fav:true,f:dvF({kinds:['task'],sts:['draft','fixed'],tag:'仕事'})},
+    {id:uid(),name:'疑問だけ',group:'kind',gv:'question',fav:true,f:dvF()},
+    {id:uid(),name:'今月の気づき',group:'kind',gv:'feeling',f:dvF({range:'month'})}]);
   await saveNodes(N.concat(newInbox?[ib]:[]));await saveMsgs(M);
   await normalizeOrders();S.cwd=null;renderList();
   toast('「テスト用サンプル」を追加しました。いらなくなったらフォルダごとごみ箱へ');
