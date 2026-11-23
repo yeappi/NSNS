@@ -497,6 +497,9 @@ body:has(.backdrop) #toast{bottom:auto;top:calc(14px + env(safe-area-inset-top,0
 .seg4{display:flex;background:#EFEAE4;border-radius:12px;padding:3px;margin:2px 0 8px}.seg4 button{flex:1;text-align:center;font-size:13px;padding:6px;border-radius:10px;color:#6d655d;font-weight:500}.seg4 button.on{background:#fff;color:var(--ink);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.06)}
 .fline{display:flex;align-items:center;gap:6px;padding:2px 2px 10px;font-size:12px;color:var(--sub);overflow:hidden;cursor:pointer}.fline .fl{font-weight:600;margin-right:2px;white-space:nowrap}.fline .fc{background:var(--card);border-radius:10px;padding:2px 9px;color:#4a443e;white-space:nowrap}.fline b{margin-left:auto;color:var(--accent-ink);font-weight:500;white-space:nowrap;padding-left:6px}
 .dvrow.un{background:transparent;box-shadow:none;border:1.5px dashed #E4DCD3}
+.tck{float:left;width:20px;height:20px;border-radius:50%;border:2px solid #C9BFB4;background:#fff;margin:2px 8px 0 -2px;padding:0;position:relative;flex:none}
+.tck.on{background:var(--accent);border-color:var(--accent)}.tck.on::after{content:"";position:absolute;left:5px;top:1.5px;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.bub.tfin,.dvm.fin .bub.task{color:#8A8177}.bub.tfin{text-decoration:line-through;text-decoration-color:rgba(0,0,0,.25);opacity:.7}.bub.tfin .tck{text-decoration:none}
 .dvstar svg{stroke:currentColor;fill:none}.dvstar.on{color:#E9A93C}.dvstar.on svg{fill:#E9A93C}
 .icon.on{background:var(--chat)}
 #dvfs .flabel{margin:10px 2px 6px}#dvfs .chip.in{background:var(--ink);color:#fff;border-color:var(--ink)}
@@ -626,6 +629,10 @@ const KINDS=[
 const KIND=Object.fromEntries(KINDS.map(k=>[k.id,k]));
 const STS=[{id:'draft',label:'未確定'},{id:'fixed',label:'確定'},{id:'done',label:'完了'}];
 const STL=Object.fromEntries(STS.map(s=>[s.id,s.label]));
+const TSTS=[{id:'draft',label:'未完了'},{id:'done',label:'完了'}];
+const stLabel=(m,k)=>{k=k||m.st;return m.kind==='task'?({draft:'未完了',fixed:'未完了',done:'完了'}[k]||STL[k]):STL[k]};
+const isTask=m=>m.by!=='ai'&&m.kind==='task'&&!m.table;
+const ckHTML=m=>isTask(m)?`<button class="tck${m.st==='done'?' on':''}" data-act="taskCk" data-id="${m.id}" title="${m.st==='done'?'未完了に戻す':'完了にする'}"></button>`:'';
 const kindText=k=>KIND[k]?KIND[k].ic+KIND[k].label:'';
 const sid=m=>m.id.slice(-6);
 
@@ -990,14 +997,14 @@ function renderChat(toBottom){
         <div class="line"><div class="bub ai${m.qid?' q':m.mid?' m':''}">${linkify(m.text||'')}</div><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button></div></div>`;
       return;
     }
-    const tch=T?`<div class="tchips">${m.kind&&KIND[m.kind]?`<button class="k" data-act="tidyM" data-id="${m.id}">${KIND[m.kind].ic} ${KIND[m.kind].label}</button>`:`<button class="add" data-act="tidyM" data-id="${m.id}">＋ 種類</button>`}${m.st&&STL[m.st]?`<button class="s ${m.st}" data-act="tidyM" data-id="${m.id}">${STL[m.st]}</button>`:''}${(m.tags||[]).map(t=>`<button data-act="tidyM" data-id="${m.id}">#${esc(t)}</button>`).join('')}${m.pinned?'<button class="ex">📢</button>':''}${m.exportedAt?'<button class="ex">✓ 書き出し済</button>':''}</div>`:'';
+    const tch=T?`<div class="tchips">${m.kind&&KIND[m.kind]?`<button class="k" data-act="tidyM" data-id="${m.id}">${KIND[m.kind].ic} ${KIND[m.kind].label}</button>`:`<button class="add" data-act="tidyM" data-id="${m.id}">＋ 種類</button>`}${m.st&&STL[m.st]?`<button class="s ${m.st}" data-act="tidyM" data-id="${m.id}">${stLabel(m)}</button>`:''}${(m.tags||[]).map(t=>`<button data-act="tidyM" data-id="${m.id}">#${esc(t)}</button>`).join('')}${m.pinned?'<button class="ex">📢</button>':''}${m.exportedAt?'<button class="ex">✓ 書き出し済</button>':''}</div>`:'';
     const chips='';const tlab=lone&&!(i>0&&ymd(ms[i-1].createdAt)===d)?`${new Date(m.createdAt).getMonth()+1}/${new Date(m.createdAt).getDate()} ${hm(m.createdAt)}`:hm(m.createdAt);
     const showMeta=lone||!nx||nx.by==='ai'||ymd(nx.createdAt)!==d||nx.createdAt-m.createdAt>5*60000||!!nx.exportedAt!==!!m.exportedAt;
     const n=m.images?.length||0;
     const imgs=n?`<div class="imgs ${n===1?'n1':n===2?'n2':n===3?'n3':n===4?'n4':'nmany'}">${m.images.map(b=>`<img data-blob="${b}" data-act="viewImg" alt="">`).join('')}</div>`:'';
     html+=`<div class="msg${S.sel&&S.sel.has(m.id)?' sel':''}" data-act="tapMsg" data-id="${m.id}" data-lpm="${m.id}">
       <div class="swact"><button data-act="msgAnn" data-id="${m.id}"><span>📢</span>${m.pinned?'外す':'アナウンス'}</button><button data-act="msgRoom" data-id="${m.id}"><span>💬</span>トークにする</button></div>
-      <div class="line"><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button><div class="bub${m.exportedAt?' done':''}${n&&!m.text?' onlyimg':''}${m.table?' tbl':''}">${imgs}${m.table?tableHTML(m):m.text?linkify(m.text):''}${tch}</div></div>
+      <div class="line"><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button><div class="bub${m.exportedAt?' done':''}${n&&!m.text?' onlyimg':''}${m.table?' tbl':''}${isTask(m)?' task':''}${isTask(m)&&m.st==='done'?' tfin':''}">${ckHTML(m)}${imgs}${m.table?tableHTML(m):m.text?linkify(m.text):''}${tch}</div></div>
       ${showMeta?`<div class="meta"><span>${tlab}</span></div>`:''}</div>`;
     if(m.aizuchi)html+=`<div class="reply"><div class="rbub">${esc(m.aizuchi)}</div></div>`;
   });
@@ -1232,7 +1239,7 @@ function msgActions(m,o={}){
   ].filter(Boolean);
   const acts=o.sort?null:[{ic:'edit',label:'編集',fn:()=>editMsg(m)},ai?{ic:'copy',label:'コピー',fn:()=>copyText(m.text||'')}:{ic:'out',label:'書き出す',fn:()=>openExport({ids:[m.id]})},{ic:'move',label:'移動',fn:()=>moveMsgsSheet([m])},{ic:'trash',label:'削除',danger:true,fn:()=>trashMsgList([m])}];
   const chips=ai?'':`<div class="qcls"><div class="flabel">種類</div><div class="chips">${KINDS.map(k=>`<span class="chip ${m.kind===k.id?'in':''}" data-qk="${k.id}">${k.ic}${k.label}</span>`).join('')}</div>
-    <div class="flabel">状態</div><div class="chips">${STS.map(x=>`<span class="chip ${m.st===x.id?'in':''}" data-qs="${x.id}">${x.id==='done'?'✓ ':''}${x.label}</span>`).join('')}</div></div>`;
+    <div class="flabel">状態</div><div class="chips">${(m.kind==='task'?TSTS:STS).map(x=>`<span class="chip ${(m.kind==='task'&&x.id==='draft'&&m.st==='fixed')||m.st===x.id?'in':''}" data-qs="${x.id}">${x.id==='done'?'✓ ':''}${x.label}</span>`).join('')}</div></div>`;
   const sortHead=o.sort?`<div class="qsort"><div class="qsl">仕分け · 残り${o.left}件</div><div class="qst">${esc((m.text||'📷 画像').slice(0,200))}</div></div>`:'';
   const main=items.filter(it=>!it.more),more=items.filter(it=>it.more);const row=it=>{const i=items.indexOf(it);return `<button data-i="${i}" class="${it.danger?'danger':''}"><span class="ic">${it.icon||''}</span><span>${esc(it.label)}${it.sub?`<span class="sub">${esc(it.sub)}</span>`:''}</span></button>`};
   const sh=openSheet(`${sortHead}${o.view&&r?`<div class="qsrc">${esc(r.name)}</div>`:''}${!o.sort?`<div class="mprev">${esc((m.text||'📷 画像').slice(0,160))}</div>`:''}${acts?actRowHTML(acts):''}${chips}${main.length?`<div class="menu">${main.map(row).join('')}</div>`:''}${more.length?`<button class="moreb" data-more>その他<span>${esc(more.map(x=>x.short||x.label).join('・'))}</span><b>›</b></button><div class="menu hidden" id="moreMenu">${more.map(row).join('')}</div>`:''}`);
@@ -2842,8 +2849,8 @@ function dvFilterSheet(){const v=S.dv.v;if(!v)return;
 function dvSegHTML(v){return `<div class="seg4">${[['kind','種類'],['tag','タグ'],['digest','月'],['none','1室']].map(([id,l])=>`<button class="${v.group===id?'on':''}" data-act="dv" data-d="group" data-v="${id}">${l}</button>`).join('')}</div>`}
 function dvBubHTML(m){
   const ai=m.by==='ai';const D=S.dv;const sel=D.sel&&D.sel.has(m.id);
-  const meta=ai?'':[m.pinned?'<span>📢</span>':'',m.st&&STL[m.st]?`<span class="sc ${m.st}">${STL[m.st]}</span>`:'',(m.tags||[]).length?`<span class="at">${m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`:'',m.fromView?'<span>🗃</span>':''].join('');
-  return `<div class="dvm${ai?' ai':''}${sel?' sel':''}${m.st==='done'?' fin':''}" data-act="dv" data-d="tapm" data-id="${m.id}">${D.sel?'<span class="dvck"></span>':''}<div class="bub${ai?' ai':''}${m.exportedAt?' done':''}">${!ai&&m.kind&&KIND[m.kind]?`<span class="kbadge">${KIND[m.kind].ic}</span>`:''}${m.table?tableHTML(m):m.text?linkify(m.text):'📷 画像'}</div>${ai?'':`<div class="meta">${meta}<span>${hm(m.createdAt)}</span></div>`}</div>`;
+  const meta=ai?'':[m.pinned?'<span>📢</span>':'',m.st&&STL[m.st]&&!(isTask(m)&&m.st==='draft')?`<span class="sc ${m.st}">${stLabel(m)}</span>`:'',(m.tags||[]).length?`<span class="at">${m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`:'',m.fromView?'<span>🗃</span>':''].join('');
+  return `<div class="dvm${ai?' ai':''}${sel?' sel':''}${m.st==='done'?' fin':''}" data-act="dv" data-d="tapm" data-id="${m.id}">${D.sel?'<span class="dvck"></span>':''}<div class="bub${ai?' ai':''}${m.exportedAt?' done':''}${isTask(m)?' task':''}">${isTask(m)?ckHTML(m):(!ai&&m.kind&&KIND[m.kind]?`<span class="kbadge">${KIND[m.kind].ic}</span>`:'')}${m.table?tableHTML(m):m.text?linkify(m.text):'📷 画像'}</div>${ai?'':`<div class="meta">${meta}<span>${hm(m.createdAt)}</span></div>`}</div>`;
 }
 /* ビューの条件から、書いたメモに付ける印を決める（決まらないものは付けない） */
 function dvMarks(v,gv){
@@ -2854,9 +2861,10 @@ function dvMarks(v,gv){
   if(v.group==='tag'&&gv&&gv!=='__none'&&gv!=='__few')o.tags.push(gv);
   if(f.tag&&!o.tags.includes(f.tag))o.tags.push(f.tag);
   if(f.pin)o.pinned=true;
+  if(o.kind==='task'&&!o.st)o.st='draft';
   o.amb=amb;return o;
 }
-function dvMarkText(v,gv){const o=dvMarks(v,gv);const a=[];if(o.kind)a.push(kindText(o.kind));if(o.st)a.push(STL[o.st]);o.tags.forEach(t=>a.push('#'+t));if(o.pinned)a.push('📢');
+function dvMarkText(v,gv){const o=dvMarks(v,gv);const a=[];if(o.kind)a.push(kindText(o.kind));if(o.st&&!(o.kind==='task'&&o.st==='draft'))a.push(o.kind==='task'?TSTS.find(x=>x.id===o.st).label:STL[o.st]);o.tags.forEach(t=>a.push('#'+t));if(o.pinned)a.push('📢');
   return a.length?a.join(' ')+' として書く':'メモを書く（印なし）'}
 const dvCanWrite=v=>!(v.group==='digest'||v.f.docsOnly);
 async function dvSend(){
@@ -2886,7 +2894,7 @@ function renderData(P){
       const icon=ic||(v.gv!=null&&v.group==='kind'&&KIND[v.gv]?KIND[v.gv].ic:direct?'💬':'🗂');
       return `<div class="dvrow" data-act="dv" data-d="open" data-id="${esc(v.id)}"><span class="ic">${icon}</span><div class="t">${esc(v.name)}<small>${direct?(pv(l[l.length-1])||'まだメモがありません'):esc(dvSub(v))}</small></div>${direct?`<span class="dvn">${l.length}</span>`:''}${isP?'':`<button class="dvfav${v.fav?' on':''}" data-act="dv" data-d="fav" data-id="${esc(v.id)}">${v.fav?'★':'☆'}</button>`}</div>`};
     const kv=DV_PRESETS.find(x=>x.id==='p:kind');const kg=dvGroups(kv);
-    const krow=g=>`<div class="dvrow${g.k==='none'?' un':''}" data-act="dv" data-d="kroom" data-v="${esc(g.k)}"><span class="ic">${KIND[g.k]?KIND[g.k].ic:'📝'}</span><div class="t">${KIND[g.k]?KIND[g.k].label:'未分類'}<small>${pv(g.lm)}</small></div><span class="dvn">${g.n}</span></div>`;
+    const krow=g=>`<div class="dvrow${g.k==='none'?' un':''}" data-act="dv" data-d="kroom" data-v="${esc(g.k)}"><span class="ic">${KIND[g.k]?KIND[g.k].ic:'📝'}</span><div class="t">${KIND[g.k]?KIND[g.k].label:'未分類'}<small>${pv(g.lm)}</small></div><span class="dvn">${g.k==='task'?dvRoomMsgs(kv,'task').filter(m=>m.by!=='ai'&&m.st!=='done').length:g.n}</span></div>`;
     head=`<div class="top"><div class="brand">データ <small>束ねて俯瞰する</small></div><button class="icon" data-act="dv" data-d="search" title="本文で探す">${ICONS.search}</button></div>`;
     body=`<div class="aipendw">${aiPendHTML()}</div>${fav.length?`<div class="dvh">⭐ お気に入り</div>${fav.map(v=>row(v)).join('')}`:''}
       <div class="dvh">種類別のトークルーム</div>${kg.map(krow).join('')||'<div class="dvempty">メモに種類が付くと、ここに並びます</div>'}
@@ -2920,7 +2928,7 @@ function renderData(P){
         <div class="ttl"><div class="tx"><div class="nm">${D.sel.size}件を選択</div><div class="sb">${esc(dvTitle(v,gv))}</div></div></div>
         <button class="chip" data-act="dv" data-d="selall" style="margin-right:6px">すべて選択</button></div>`;
     }else head=`<div class="top"><button class="icon" data-act="dv" data-d="back" title="戻る">${ICONS.back}</button>
-      <div class="ttl"><div class="tx"><div class="nm">${esc(dvTitle(v,inRoom?gv:null))}</div><div class="sb">${inRoom?dvRoomMsgs(v,gv).filter(m=>m.by!=='ai').length:dvCount(v)}件 · ${esc((DV_RANGES.find(x=>x[0]===(v.f.range||''))||['','全期間'])[1])}${changed?' · 未保存':''}</div></div></div>
+      <div class="ttl"><div class="tx"><div class="nm">${esc(dvTitle(v,inRoom?gv:null))}</div><div class="sb">${inRoom?(v.group==='kind'&&gv==='task'?(()=>{const t=dvRoomMsgs(v,gv).filter(m=>m.by!=='ai');return `未完了 ${t.filter(m=>m.st!=='done').length}件`})():dvRoomMsgs(v,gv).filter(m=>m.by!=='ai').length+'件'):dvCount(v)+'件'} · ${esc((DV_RANGES.find(x=>x[0]===(v.f.range||''))||['','全期間'])[1])}${changed?' · 未保存':''}</div></div></div>
       <button class="icon${D.showF||v.f.q?' on':''}" data-act="dv" data-d="showF" title="本文で探す">${ICONS.search}</button>
       <button class="icon dvstar${saved&&v.fav?' on':''}" data-act="dv" data-d="${saved?'favcur':'save'}" title="${saved?(v.fav?'お気に入りから外す':'お気に入りにする'):'ビューを保存'}">${ICONS.star}</button>
       <button class="icon" data-act="dv" data-d="export" title="書き出す">${ICONS.out}</button>
@@ -3143,6 +3151,10 @@ const ACT={
   exportHere:()=>openExport({scope:S.cwd?[S.cwd]:[]}),
   exportRoom:()=>openExport({scope:[S.roomId]}),
   tidy:()=>{S.tidy=!S.tidy;LS.set('tidy',S.tidy);renderRoom(true);toast(S.tidy?'整理モード：種類・状態・タグを表示します':'整理モードを終えました')},
+  taskCk:async(el,e)=>{e&&e.stopPropagation();const m=S.msgs.get(el.dataset.id);if(!m)return;
+    const prev=[m.st??null,m.kindBy??null];m.st=m.st==='done'?'draft':'done';m.kindBy='me';await saveMsg(m);
+    if(S.tab==='data')S.dv.keepScroll=true;
+    refreshMsgs();if(m.st==='done')toast('完了にしました','元に戻す',async()=>{m.st=prev[0];m.kindBy=prev[1];await saveMsg(m);if(S.tab==='data')S.dv.keepScroll=true;refreshMsgs()})},
   tidyM:(el,e)=>{e&&e.stopPropagation();const m=S.msgs.get(el.dataset.id);if(m)msgActions(m)},
   closeRoom,
   pickImg:()=>$('#fileImg').click(),
