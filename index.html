@@ -532,6 +532,7 @@ body:has(.backdrop) #toast{bottom:auto;top:calc(14px + env(safe-area-inset-top,0
 .ibri.pop{animation:flash 1.2s}
 .ibband{display:flex;align-items:center;gap:6px;margin:6px 12px 0;padding:7px 8px 7px 12px;border-radius:12px;background:#FFF4E2;color:#7A5A2E;font-size:13px}
 .ibband span{flex:1}.ibband b{font-weight:700}.ibband button{padding:5px 10px;border-radius:10px;background:rgba(255,255,255,.85);color:#7A5A2E;font-size:12px;font-weight:500}
+.aflist{max-height:46vh;overflow:auto}.afrow{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--line,#eee)}.afrow .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.afrow .chip{flex:none}
 .ibband{flex-wrap:wrap}.ibband span{min-width:90px}.ibarch{display:block;margin:2px 12px 0 auto;padding:4px 10px;border-radius:10px;background:#FFF4E2;color:#7A5A2E;font-size:12px}
 .ibband.ok{background:#EAF3E4;color:#4F7A55}
 .qsort{background:#FFF4E2;border-radius:14px;padding:10px 12px;margin:0 0 6px}.qsl{font-size:11px;color:#9A7A4E;margin-bottom:3px}.qst{white-space:pre-wrap;font-size:14.5px;line-height:1.6;color:#4A3A22}
@@ -1199,6 +1200,7 @@ function nodeMenu(id){
     n.type==='room'?{toggle:true,icon:'💬',label:'相槌',sub:'メモを送ると、ひとこと返事します',on:!!n.aizuchi,fn:async on=>{n.aizuchi=on;await saveNode(n);if(!on){clearTimeout(aizT);aizT=null;setTyping(null)}toast(on?'相槌をオンにしました':'相槌をオフにしました')}}:null,
     n.type==='room'&&S.roomId===n.id?{more:1,short:'選択',icon:'☑',label:'まとめて選択',sub:'メモを選んで分類・書き出し・移動',fn:()=>selStart()}:null,
     !n.docs&&!ib?{more:1,short:'アーカイブ',icon:'🗄',label:n.archived?'アーカイブから戻す':'アーカイブする',sub:n.archived?'':(n.type==='folder'?'中のトークごと、アーカイブ帯にしまう':'アーカイブ帯にしまう。検索には出ます'),fn:()=>setArchived([n],!n.archived)}:null,
+    !n.docs&&!ib?{more:1,short:'あとの扱い',icon:'🧹',label:'AI・書き出しのあとの扱い',sub:(()=>{const c=afterSrc(n);return c?`${AFTER_L[c.after]}${c===n?'':'（引き継ぎ）'}`:`${AFTER_L[afterDef()]}（初期値）`})(),fn:()=>afterSet(n)}:null,
     n.type==='room'?{more:1,short:'バッジ',icon:n.badge?'○':'●',label:n.badge?'バッジを出さない':'未書き出しバッジを出す',fn:async()=>{n.badge=!n.badge;await saveNode(n);renderList()}}:null,
     {more:1,short:'済み印を外す',icon:'↺',label:'書き出し済みの印をすべて外す',fn:async()=>{const set=new Set(n.type==='room'?[n.id]:descendants(n.id).filter(d=>d.type==='room').map(d=>d.id));const ch=[...S.msgs.values()].filter(m=>set.has(m.roomId)&&m.exportedAt);ch.forEach(m=>{m.exportedAt=null;m.exportId=null});await saveMsgs(ch);renderList();renderChat();toast(`${ch.length}件の印を外しました`)}},
   ],{acts:[{ic:'edit',label:'編集',fn:()=>editNodeSheet(n)},{ic:'out',label:'書き出す',fn:()=>openExport({scope:[n.id]})},ib?null:{ic:'move',label:'移動',fn:()=>moveSheet(n)},ib?null:{ic:'trash',label:'削除',danger:true,fn:()=>deleteNodes([n])}]});
@@ -1436,6 +1438,7 @@ async function recordExport(list,kind){
   const old=[...S.exports.values()].sort((a,c)=>c.at-a.at).slice(100);for(const o of old){S.exports.delete(o.id);await DB.del('exports',o.id)}
   renderList();renderChat();
   if(O.mark)toast(`${list.length}件を書き出し済みにしました`,'元に戻す',()=>undoExport(b));
+  afterRun(list.map(m=>S.nodes.get(m.roomId)),list).then(u=>{if(u&&(u.archived.length||u.moved.length))toast('元のメモを片づけました','元に戻す',async()=>{await afterUndo(u);renderList();renderRoom(true);LVrefresh&&LVrefresh()})});
   return b;
 }
 async function undoExport(b){
@@ -1677,6 +1680,7 @@ function settings(){
       <button data-m="sync"><span class="ic">☁️</span><span>クラウド同期<span class="sub">${SYNC.sess?'ログイン中':'PCとスマホでメモをそろえる'}</span></span></button>
       <button data-m="backup"><span class="ic">💾</span><span>まるごとバックアップ（.json）<span class="sub">画像・書き出し履歴・保存した条件も含みます</span></span></button>
       <button data-m="restore"><span class="ic">📥</span><span>バックアップから復元</span></button>
+      <button data-m="after"><span class="ic">🧹</span><span>AI・書き出しのあとの初期値<span class="sub">いま：${AFTER_L[afterDef()]}（フォルダ・トークごとに変えられます）</span></span></button>
       <button data-m="history"><span class="ic">🕘</span><span>書き出し履歴</span></button>
       <button data-m="import"><span class="ic">📥</span><span>AIの結果を取り込む<span class="sub">取り込みの履歴・取り消しもここから</span></span></button>
       <button data-m="trash"><span class="ic">🗑</span><span>ごみ箱<span class="sub">消したものは90日間ここから戻せます</span></span></button>
@@ -1686,6 +1690,7 @@ function settings(){
   sh.querySelector('[data-m=sync]').onclick=()=>{closeSheet();syncSheet()};
   sh.querySelector('[data-m=backup]').onclick=()=>{closeSheet();backup()};
   sh.querySelector('[data-m=restore]').onclick=()=>{closeSheet();$('#fileBackup').click()};
+  sh.querySelector('[data-m=after]').onclick=()=>{closeSheet();menuSheet('初期値',AFTER.map(([k,l])=>({icon:afterDef()===k?'●':'○',label:l,fn:()=>{LS.set('afterDef',k);toast(`初期値を「${l}」にしました`)}})))};
   sh.querySelector('[data-m=history]').onclick=()=>{closeSheet();historySheet()};
   sh.querySelector('[data-m=import]').onclick=()=>{closeSheet();importSheet()};
   sh.querySelector('[data-m=trash]').onclick=()=>{closeSheet();trashSheet()};
@@ -1758,6 +1763,57 @@ function classifySheet(list,onDone){
   };
 }
 
+/* ---- 「あとの扱い」：AI（データ化・資料化）や書き出しのあと、元のメモをどうするか ---- */
+const AFTER=[['keep','残す'],['memos','メモだけ片づける'],['archive','トークごとアーカイブ']];
+const AFTER_L=Object.fromEntries(AFTER);
+const afterDef=()=>{const v=LS.get('afterDef','keep');return AFTER_L[v]?v:'keep'};
+function afterSrc(n){let c=n;while(c){if(AFTER_L[c.after])return c;c=c.parentId?S.nodes.get(c.parentId):null}return null}
+const afterOf=n=>{const c=afterSrc(n);return c?c.after:afterDef()};
+function afterTargets(rooms){return [...new Map((rooms||[]).filter(r=>r&&r.type==='room'&&S.nodes.has(r.id)&&!r.docs&&!isSys(r)&&!r.archived&&!afterParentArchived(r)).map(r=>[r.id,r])).values()]}
+function afterParentArchived(n){let c=n.parentId?S.nodes.get(n.parentId):null;while(c){if(c.archived)return true;c=c.parentId?S.nodes.get(c.parentId):null}return false}
+/* 確認：トークごとに扱いを選ぶ。返り値は {roomId:扱い} か null（何もしない） */
+function afterAsk(rooms,hint){return new Promise(res=>{
+  const act=new Map(rooms.map(r=>[r.id,hint&&hint.has(r.id)&&!afterSrc(r)?hint.get(r.id):afterOf(r)]));
+  const sh=openSheet(`<h3>元のメモをどうしますか？</h3><p style="color:var(--sub);font-size:13.5px;margin:-6px 2px 10px">各行をタップで切り替え。設定はフォルダ・トークのメニューから変えられます。</p>
+    <div class="aflist">${rooms.map(r=>`<div class="afrow"><span class="n">${esc((r.emoji?r.emoji+' ':'')+r.name)}</span><button class="chip" data-r="${r.id}"></button></div>`).join('')}</div>
+    <div class="btns" style="margin-top:12px"><button class="btn" data-x="no">何もしない</button><button class="btn pri" data-x="ok">実行</button></div>`);
+  const bd=sh.parentElement;let done=false;const fin=v=>{if(done)return;done=true;obs.disconnect();res(v)};
+  const obs=new MutationObserver(()=>{if(!bd.isConnected)fin(null)});obs.observe(document.body,{childList:true});
+  const draw=()=>sh.querySelectorAll('[data-r]').forEach(b=>b.textContent=AFTER_L[act.get(b.dataset.r)]);draw();
+  sh.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const i=AFTER.findIndex(x=>x[0]===act.get(b.dataset.r));act.set(b.dataset.r,AFTER[(i+1)%AFTER.length][0]);draw()});
+  sh.querySelector('[data-x=no]').onclick=()=>{closeSheet(bd);fin(null)};
+  sh.querySelector('[data-x=ok]').onclick=()=>{closeSheet(bd);fin(Object.fromEntries(act))};
+})}
+/* 実行：archive＝トークをアーカイブ（中身が全部アーカイブされたフォルダも）／memos＝メモをアーカイブinboxへ（元のトークを記録） */
+async function afterExec(rooms,plan,msgsBy){
+  const u={archived:[],moved:[]};const nodes=[];const mv=[];
+  for(const r of rooms){const a=plan[r.id];
+    if(a==='archive'){r.archived=true;nodes.push(r);u.archived.push(r.id)}
+    else if(a==='memos'){const l=(msgsBy&&msgsBy.get(r.id))||roomMsgs(r.id).filter(m=>m.by!=='ai');l.forEach(m=>{if(m.by!=='ai'&&m.roomId===r.id)mv.push(m)})}}
+  if(u.archived.length){const seen=new Set();
+    for(const r of rooms){if(!u.archived.includes(r.id))continue;let c=r.parentId?S.nodes.get(r.parentId):null;
+      while(c&&!seen.has(c.id)){seen.add(c.id);if(c.archived||isSys(c))break;
+        const rs=descendants(c.id).filter(d=>d.type==='room'&&!d.docs&&!isSys(d));
+        if(rs.length&&rs.every(d=>d.archived)){c.archived=true;nodes.push(c);u.archived.push(c.id)}else break;
+        c=c.parentId?S.nodes.get(c.parentId):null}}}
+  if(mv.length){const a=await ensureIbArch();mv.forEach(m=>{m.fromRoom=m.roomId;m.roomId=a.id});a.lastAt=Math.max(a.lastAt||0,...mv.map(m=>m.createdAt));await saveMsgs(mv);nodes.push(a);u.moved=mv.map(m=>m.id)}
+  if(nodes.length)await saveNodes([...new Map(nodes.map(n=>[n.id,n])).values()]);
+  return u}
+async function afterUndo(u){if(!u)return;
+  const ns=(u.archived||[]).map(x=>S.nodes.get(x)).filter(Boolean);ns.forEach(n=>n.archived=false);if(ns.length)await saveNodes(ns);
+  const ms=(u.moved||[]).map(x=>S.msgs.get(x)).filter(m=>m&&m.fromRoom&&S.nodes.has(m.fromRoom));ms.forEach(m=>{m.roomId=m.fromRoom;delete m.fromRoom});if(ms.length)await saveMsgs(ms)}
+/* 元のメモの扱いを聞いて実行する。何も片づけないときは null */
+async function afterRun(rooms,msgs,hint){
+  const rs=afterTargets(rooms);if(!rs.length)return null;
+  if(!rs.some(r=>afterOf(r)!=='keep'||(hint&&hint.has(r.id))))return null;
+  const plan=await afterAsk(rs,hint);if(!plan)return null;
+  const act=rs.filter(r=>plan[r.id]!=='keep');if(!act.length)return null;
+  let by=null;if(msgs){by=new Map();msgs.forEach(m=>{if(!by.has(m.roomId))by.set(m.roomId,[]);by.get(m.roomId).push(m)})}
+  const u=await afterExec(act,plan,by);renderList();renderRoom(true);LVrefresh&&LVrefresh();return u}
+function afterSet(n){const cur=n.after&&AFTER_L[n.after]?n.after:'';const src=afterSrc(n);
+  const inh=src&&src!==n?`引き継ぎ（${esc(src.name)}：${AFTER_L[src.after]}）`:`引き継ぎ（全体の初期値：${AFTER_L[afterDef()]}）`;
+  menuSheet('AI・書き出しのあと',[{icon:cur===''?'●':'○',label:inh.replace(/<[^>]*>/g,''),fn:async()=>{delete n.after;await saveNode(n);toast('引き継ぎにしました')}},
+    ...AFTER.map(([k,l])=>({icon:cur===k?'●':'○',label:l,sub:k==='keep'?'そのまま。何も動かしません':k==='memos'?'使ったメモをアーカイブinboxへ移す':(n.type==='folder'?'中のトークをアーカイブ帯にしまう':'トークをアーカイブ帯にしまう'),fn:async()=>{n.after=k;await saveNode(n);toast(`「${l}」にしました`)}}))])}
 /* ---- アーカイブ（トーク単位。削除ではなく「しまう」） ---- */
 async function setArchived(rooms,on){
   rooms=rooms.filter(r=>r&&!r.docs&&!isSys(r));if(!rooms.length)return;
@@ -2393,6 +2449,9 @@ function planQuestions(j,rec){
       await saveNodes(use.map(x=>x.n));if(S.roomId&&use.some(x=>x.n.id===S.roomId))renderRoom(true);
       if(rec)aiDropRec(rec.id);return {prevRun,open:use.length===1?use[0].n.id:null}}};
 }
+const aiSrcMsgs=rec=>[...new Set(Object.entries((rec&&rec.refs)||{}).filter(([k])=>/^m/.test(k)).map(([,id])=>S.msgs.get(id)).filter(m=>m&&m.by!=='ai'))];
+const aiSrcRooms=rec=>{const o=(rec&&rec.refs)||{};const rs=Object.entries(o).filter(([k])=>/^r/.test(k)).map(([,id])=>S.nodes.get(id)).filter(n=>n&&n.type==='room');
+  const fromM=aiSrcMsgs(rec).map(m=>S.nodes.get(m.roomId));return [...rs,...fromM].filter(Boolean)};
 function planDigest(j,rec){
   const text=(Array.isArray(j.lines)?j.lines.map(x=>String(x)).join('\n'):String(j.text||'')).trim();if(!text)throw new Error('まとめの本文（lines）がありません');
   const title=String(j.title||'まとめ').trim().slice(0,60);
@@ -2408,9 +2467,9 @@ function planDigest(j,rec){
       if(!docs){docs={id:uid(),type:'room',parentId:fid,name:'資料',emoji:'📌',color:PALETTE[4],tags:[],badge:false,docs:true,order:nextTopOrder(fid),createdAt:t,lastAt:t,importId:iid};nodes.push(docs.id)}
       const m={id:uid(),roomId:docs.id,text:`【${title}】\n${text}`,images:[],createdAt:t,exportedAt:null,exportId:null,kind:'info',kindBy:'ai',aiMade:true,importId:iid};
       docs.lastAt=t;await saveNode(docs);await saveMsg(m);
-      let archived=[];
-      if(arch.length&&await confirmSheet(`${arch.length}件のトークをアーカイブしますか？`,arch.map(n=>n.name).join('、')+'　— アーカイブ帯にしまいます。いつでも戻せます。','アーカイブする')){arch.forEach(n=>n.archived=true);await saveNodes(arch);archived=arch.map(n=>n.id)}
-      if(rec)aiDropRec(rec.id);return {nodes,roots:nodes,msgs:[m.id],archived,open:docs.id}}};
+      const hint=new Map(arch.map(n=>[n.id,'archive']));
+      const au=await afterRun([...aiSrcRooms(rec),...arch],aiSrcMsgs(rec),hint);const archived=au?au.archived:[];const afterMoved=au?au.moved:[];
+      if(rec)aiDropRec(rec.id);return {nodes,roots:nodes,msgs:[m.id],archived,afterMoved,open:docs.id}}};
 }
 function planThink(j,rec){
   const R=aiResolver(rec);
@@ -2480,7 +2539,8 @@ function planData(j,rec){
       const md=['| '+cols.join(' | ')+' |','| '+cols.map(()=>'---').join(' | ')+' |',...use.map(r=>'| '+r.cells.map(c=>c.replace(/\|/g,'／')).join(' | ')+' |')].join('\n');
       const m={id:uid(),roomId:docs.id,text:`【${title}】\n${md}`,images:[],createdAt:t,exportedAt:null,exportId:null,kind:'info',kindBy:'ai',aiMade:true,importId:iid,table:{title,columns:cols,rows:use.map(r=>r.cells),from:use.map(r=>r.from?.id||null)}};
       docs.lastAt=t;await saveNode(docs);await saveMsg(m);if(rec)aiDropRec(rec.id);
-      return {nodes,roots:nodes,msgs:[m.id],open:docs.id}}};
+      const au=await afterRun(aiSrcRooms(rec),aiSrcMsgs(rec));
+      return {nodes,roots:nodes,msgs:[m.id],archived:au?au.archived:[],afterMoved:au?au.moved:[],open:docs.id}}};
 }
 function planMemos(j,rec){
   const mapT=tagMapper();const RL=[];let miss=0;
@@ -2600,7 +2660,7 @@ async function undoImport(id){
   if(u.moved&&u.moved.length){const ns=[];for(const x of u.moved){const n=S.nodes.get(x.id);if(n){n.parentId=x.parentId;n.order=x.order;ns.push(n)}}if(ns.length)await saveNodes(ns)}
   if(u.prevRun){const ns=[];for(const [id,v] of Object.entries(u.prevRun)){const n=S.nodes.get(id);if(n){if(v)n.mrun=v;else delete n.mrun;S.qa.delete(id);ns.push(n)}}if(ns.length)await saveNodes(ns);if(S.roomId)renderRoom(true)}
   if(u.prevRec){const ns=[];for(const [id,v] of Object.entries(u.prevRec)){const n=S.nodes.get(id);if(n){if(v)n.rec=v;else delete n.rec;ns.push(n)}}if(ns.length)await saveNodes(ns)}
-  if(u.archived&&u.archived.length){const ns=u.archived.map(x=>S.nodes.get(x)).filter(Boolean);ns.forEach(n=>n.archived=false);if(ns.length)await saveNodes(ns)}
+  if((u.archived&&u.archived.length)||(u.afterMoved&&u.afterMoved.length))await afterUndo({archived:u.archived,moved:u.afterMoved});
   const all=new Map();(u.nodes||[]).forEach(x=>{const n=S.nodes.get(x);if(n){all.set(x,n);if(n.type==='folder')descendants(x).forEach(d=>all.set(d.id,d))}});
   const rooms=new Set([...all.values()].filter(n=>n.type==='room').map(n=>n.id));
   const msgs=new Set((u.msgs||[]).map(x=>S.msgs.get(x)).filter(Boolean));S.msgs.forEach(m=>{if(rooms.has(m.roomId))msgs.add(m)});
