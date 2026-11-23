@@ -426,6 +426,8 @@ details.adv .in{padding:0 14px 14px}
 .msg .line{transition:transform .18s}
 .swact{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:none;gap:4px;z-index:1}
 .msg.sw .swact{display:flex}
+.msg.sw .line{padding-right:120px}
+.msg.sw .mbtn{display:none}
 .swact button{display:flex;flex-direction:column;align-items:center;justify-content:center;width:54px;padding:6px 2px;border-radius:12px;background:#fff;box-shadow:0 1px 3px rgba(60,40,20,.12);font-size:10px;color:#5F5850}
 .swact button span{font-size:17px;line-height:1.2}
 
@@ -2177,7 +2179,7 @@ document.addEventListener('pointermove',e=>{if(!MSW.el)return;const dx=e.clientX
   MSW.dx=Math.max(-130,Math.min(0,dx));MSW.el.querySelector('.line').style.transform=`translateX(${MSW.dx}px)`},true);
 ['pointerup','pointercancel'].forEach(ev=>document.addEventListener(ev,()=>{if(!MSW.el)return;const el=MSW.el;MSW.el=null;if(!MSW.on)return;
   G.suppress=true;setTimeout(()=>{G.suppress=false},350);
-  if(MSW.dx<-60){mswClose();el.classList.add('sw');el.querySelector('.line').style.transform='translateX(-118px)';MSW.open=el}
+  if(MSW.dx<-60){mswClose();el.querySelector('.line').style.transform='';el.classList.add('sw');MSW.open=el}
   else el.querySelector('.line').style.transform=''},true));
 
 /* =========================================================
