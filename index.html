@@ -467,6 +467,18 @@ details.adv .in{padding:0 14px 14px}
 .dvday{font-size:11px;color:var(--sub);text-align:center;margin:12px 0 6px}
 .dvnote{font-size:11px;color:var(--sub);margin-left:6px}
 .lvhost .lvc{margin-bottom:6px}
+.dvchat{padding-top:4px}
+.dvcount{font-size:11px;color:var(--sub);text-align:center;margin:6px 0 2px}
+.dvsrc{font-size:11px;color:var(--sub);text-align:right;margin:10px 4px 2px;cursor:pointer}
+.dvsrc.ai{text-align:left}
+.dvsrc:active{color:var(--accent-ink)}
+.dvm{display:flex;flex-direction:column;align-items:flex-end;margin:3px 0 3px 52px;cursor:pointer}
+.dvm.ai{align-items:flex-start;margin:3px 52px 3px 0}
+.dvm .meta{margin:3px 2px 2px}
+.dvfbtn{position:relative;font-size:20px;color:var(--sub)}.dvfbtn.on{color:var(--accent-ink)}
+.dvfbtn i{position:absolute;top:2px;right:0;font-style:normal;font-size:10px;background:var(--accent);color:#fff;border-radius:8px;min-width:15px;height:15px;line-height:15px;padding:0 3px}
+.dvchat .dvf{background:rgba(255,255,255,.6);border-radius:14px;padding:8px;margin:4px 0 6px}
+.dvro{flex:none;text-align:center;font-size:12px;color:var(--sub);padding:10px}
 </style>
 </head>
 <body>
@@ -608,10 +620,11 @@ const kids=pid=>idx().kids.get(pid||null)||[];
 const roomMsgs=rid=>idx().byRoom.get(rid)||[];
 function ancestors(id){const out=[];let n=S.nodes.get(id);let p=n&&n.parentId;while(p){const a=S.nodes.get(p);if(!a)break;out.unshift(a);p=a.parentId}return out}
 function descendants(id){const out=[];const walk=p=>kids(p).forEach(k=>{out.push(k);if(k.type==='folder')walk(k.id)});walk(id);return out}
+function isArchived(n){for(let x=n,i=0;x&&i<50;x=x.parentId?S.nodes.get(x.parentId):null,i++)if(x.archived&&!x.ibArch)return true;return false}
 function lastAt(n){const c=idx().lastAt;if(c.has(n.id))return c.get(n.id);const v=n.type==='room'?(n.lastAt||n.createdAt):Math.max(n.createdAt,...kids(n.id).map(lastAt));c.set(n.id,v);return v}
 function badgeCount(n){const c=idx().badge;if(c.has(n.id))return c.get(n.id);let v=0;
   if(n.type==='room'){if(n.badge&&!n.archived)for(const m of roomMsgs(n.id))if(!m.exportedAt&&m.by!=='ai')v++}
-  else kids(n.id).forEach(k=>v+=badgeCount(k));c.set(n.id,v);return v}
+  else if(!n.archived)kids(n.id).forEach(k=>v+=badgeCount(k));c.set(n.id,v);return v}
 function latestRoom(fid){let best=null,bt=-1;descendants(fid).forEach(d=>{if(d.type==='room'){const t=d.lastAt||0;if(t>bt){bt=t;best=d}}});return best}
 function nodeTagsDeep(rid){const c=idx().rtags;if(c.has(rid))return c.get(rid);const r=S.nodes.get(rid);const s=new Set();if(r){ancestors(rid).forEach(a=>(a.tags||[]).forEach(t=>s.add(t)));(r.tags||[]).forEach(t=>s.add(t))}const v=[...s];c.set(rid,v);return v}
 function msgTags(m){const s=new Set(nodeTagsDeep(m.roomId));hashtags(m.text).forEach(t=>s.add(t));(m.tags||[]).forEach(t=>s.add(t));return s}
@@ -766,7 +779,7 @@ function fillListBody(){
     if(!S.cwd){const ib=getInbox();all=all.filter(n=>n!==ib&&!n.fav);
       top=ib?itemHTML(ib,{fixed:true}):`<li class="iw" data-static="1"><div class="item" data-act="openInbox">${avatar({name:'inbox',emoji:'📥',color:PALETTE[5]})}<div class="mid"><div class="nmrow"><div class="nm">inbox</div></div><div class="pv">思いついたことを、まずここへ</div></div></div></li>`;
       const favs=sortNodes([...S.nodes.values()].filter(n=>n.fav&&!n.inbox));top+=favs.map(n=>itemHTML(n,{fav:true,path:!!n.parentId})).join('')}
-    const arch=all.filter(n=>n.archived);
+    const ia=getIbArch();const arch=all.filter(n=>n.archived&&!(n===ia&&!roomMsgs(n.id).length)).sort((a,b)=>(b===ia)-(a===ia));
     const items=all.filter(n=>!n.archived).map(n=>itemHTML(n));
     if(items.length||top)html=backupReminder()+`<ul class="list"${arch.length||!items.length?' style="padding-bottom:4px"':''}>${top}${items.join('')}</ul>`;
     if(!items.length&&!arch.length){
@@ -775,7 +788,7 @@ function fillListBody(){
     }
     if(arch.length){
       html+=`<button class="trashrow" data-act="toggleArch" style="margin-top:6px">🗄 アーカイブ（${arch.length}）${S.showArch?'　▲':'　▼'}</button>`;
-      if(S.showArch)html+=`<ul class="list" style="padding-bottom:4px">${arch.map(n=>itemHTML(n)).join('')}</ul>`;
+      if(S.showArch)html+=`<ul class="list" style="padding-bottom:4px">${arch.map(n=>itemHTML(n,{fixed:n===ia})).join('')}</ul>`;
     }
     if(!S.cwd&&!S.lsel){const tg=trashGroups().length;if(tg)html+=`<button class="trashrow" data-act="trash">🗑 ごみ箱（${tg}）</button>`}
   }
@@ -1051,14 +1064,14 @@ function newNode(type){editNodeSheet({id:uid(),type,parentId:S.cwd,name:'',emoji
 
 function nodeMenu(id){
   const n=S.nodes.get(id);if(!n)return;
-  const ib=isInbox(n);
+  const ib=isSys(n);
   menuSheet(n.name,[
     ib?null:{icon:n.fav?'☆':'⭐',label:n.fav?'お気に入りから外す':'お気に入り',sub:n.fav?'':'ホームの上（inboxの下）に並びます',fn:async()=>{n.fav=!n.fav;await saveNode(n);renderList()}},
     n.type==='room'?{toggle:true,icon:'💬',label:'相槌',sub:'メモを送ると、ひとこと返事します',on:!!n.aizuchi,fn:async on=>{n.aizuchi=on;await saveNode(n);if(!on){clearTimeout(aizT);aizT=null;setTyping(null)}toast(on?'相槌をオンにしました':'相槌をオフにしました')}}:null,
     {icon:'✎',label:'名前・アイコン・タグを編集',fn:()=>editNodeSheet(n)},
     {icon:'↗',label:'ここから書き出す',fn:()=>openExport({scope:[n.id]})},
     {icon:'🤖',label:'AIで整理する',sub:'分類・次の問い・資料化',fn:()=>aiNodeMenu(n)},
-    n.type==='room'&&!n.docs&&!ib?{icon:'🗄',label:n.archived?'アーカイブから戻す':'アーカイブする',sub:n.archived?'':'一覧の下にしまう。検索には出ます',fn:()=>setArchived([n],!n.archived)}:null,
+    !n.docs&&!ib?{icon:'🗄',label:n.archived?'アーカイブから戻す':'アーカイブする',sub:n.archived?'':(n.type==='folder'?'中のトークごと、アーカイブ帯にしまう':'アーカイブ帯にしまう。検索には出ます'),fn:()=>setArchived([n],!n.archived)}:null,
     ib?null:{icon:'⇢',label:'移動する',fn:()=>moveSheet(n)},
     n.type==='room'?{icon:n.badge?'○':'●',label:n.badge?'バッジを出さない':'未書き出しバッジを出す',fn:async()=>{n.badge=!n.badge;await saveNode(n);renderList()}}:null,
     {icon:'↺',label:'書き出し済みの印をすべて外す',fn:async()=>{const set=new Set(n.type==='room'?[n.id]:descendants(n.id).filter(d=>d.type==='room').map(d=>d.id));const ch=[...S.msgs.values()].filter(m=>set.has(m.roomId)&&m.exportedAt);ch.forEach(m=>{m.exportedAt=null;m.exportId=null});await saveMsgs(ch);renderList();renderChat();toast(`${ch.length}件の印を外しました`)}},
@@ -1066,7 +1079,7 @@ function nodeMenu(id){
   ]);
 }
 async function deleteNodes(list){
-  list=list.filter(n=>S.nodes.has(n.id)&&!isInbox(n));if(!list.length)return;
+  list=list.filter(n=>S.nodes.has(n.id)&&!isSys(n));if(!list.length)return;
   const all=new Map();list.forEach(n=>{all.set(n.id,n);if(n.type==='folder')descendants(n.id).forEach(d=>all.set(d.id,d))});
   const rooms=new Set([...all.values()].filter(x=>x.type==='room').map(x=>x.id));
   const msgs=[...S.msgs.values()].filter(m=>rooms.has(m.roomId));
@@ -1080,7 +1093,7 @@ async function deleteNodes(list){
 function treeRows(pid,depth,o){let out=[];[...kids(pid)].filter(k=>k.type==='folder'||o.rooms).sort((a,b)=>(a.type===b.type?0:a.type==='folder'?-1:1)||a.name.localeCompare(b.name,'ja')).forEach(k=>{out.push(o.row(k,depth));if(k.type==='folder')out=out.concat(treeRows(k.id,depth+1,o))});return out}
 function moveSheet(n){moveNodesSheet([n])}
 function moveNodesSheet(list,onDone){
-  list=list.filter(n=>!isInbox(n));if(!list.length)return;
+  list=list.filter(n=>!isSys(n));if(!list.length)return;
   const bad=new Set();list.forEach(n=>{bad.add(n.id);if(n.type==='folder')descendants(n.id).forEach(d=>bad.add(d.id))});
   let target=list.length===1?(list[0].parentId||''):(S.cwd||'');
   const rows=[`<div class="row ${!target?'on':''}" data-t=""><span class="ck">✓</span>🏠 ホーム（いちばん上）</div>`].concat(treeRows(null,0,{row:(k,d)=>`<div class="row ${bad.has(k.id)?'dis':''} ${k.id===target?'on':''}" data-t="${k.id}" style="padding-left:${8+d*20}px"><span class="ck">✓</span>${avatar(k,true)}<span>${esc(k.name)}</span></div>`}));
@@ -1511,7 +1524,8 @@ function classifySheet(list,onDone){
       if(touched.pin)m.pinned=pin;
     }
     await saveMsgs(list);closeSheet();
-    if(onDone)onDone();else renderChat();
+    const ibId=getInbox()?.id;const moved=touched.kind?await ibAutoArchive(list):[];
+    if(onDone)onDone();else renderChat();if(moved.length){renderList();ibMovedToast(moved,ibId)}
     LVrefresh&&LVrefresh();
     if(list.length>1)toast(`${list.length}件を分類しました`);
   };
@@ -1519,7 +1533,7 @@ function classifySheet(list,onDone){
 
 /* ---- アーカイブ（トーク単位。削除ではなく「しまう」） ---- */
 async function setArchived(rooms,on){
-  rooms=rooms.filter(r=>r&&r.type==='room'&&!r.docs);if(!rooms.length)return;
+  rooms=rooms.filter(r=>r&&!r.docs&&!isSys(r));if(!rooms.length)return;
   rooms.forEach(r=>r.archived=!!on);await saveNodes(rooms);renderList();renderRoom(true);LVrefresh&&LVrefresh();
   if(on)toast(rooms.length===1?`「${rooms[0].name}」をアーカイブしました`:`${rooms.length}件をアーカイブしました`,'元に戻す',()=>setArchived(rooms,false));
   else toast('アーカイブから戻しました');
@@ -1537,7 +1551,7 @@ function lvCollect(F){
     const r=S.nodes.get(m.roomId);if(!r)continue;
     if(since&&m.createdAt<since)continue;
     if(F.docsOnly&&!r.docs)continue;
-    if(r.archived&&!F.arch)continue;
+    if(!F.arch&&(r.archived||r.parentId)&&isArchived(r))continue;
     if(m.by==='ai'&&!F.ai)continue;
     if(F.pin&&!m.pinned)continue;
     if(ks.size&&!ks.has(m.kind||'none'))continue;
@@ -1844,7 +1858,7 @@ function planClassify(j){
       for(const c of ch){const m=c.m;prev[m.id]=[m.kind??null,m.st??null,m.tags||[],m.kindBy??null];
         if(m.kindBy!=='me'){m.kind=c.kind;m.st=c.st;m.kindBy='ai'}
         m.tags=[...new Set([...(m.tags||[]),...c.tags])];m.importId=iid;list.push(m)}
-      await saveMsgs(list);return {prev}}};
+      await saveMsgs(list);const ibId=getInbox()?.id;const ibMoved=await ibAutoArchive(list);return {prev,ibMoved,ibId}}};
 }
 function planBrainstorm(j){
   const f=j.folder||{};const rooms=(Array.isArray(f.rooms)?f.rooms:[]).filter(r=>r&&String(r.title||r.name||'').trim());
@@ -1911,6 +1925,7 @@ const saveImports=a=>LS.set('imports',a.slice(0,15));
 async function undoImport(id){
   const a=importsLog();const r=a.find(x=>x.id===id);if(!r||r.undone)return;const u=r.undo||{};
   if(u.prev){const ch=[];for(const [mid,[k,st,tags,kb]] of Object.entries(u.prev)){const m=S.msgs.get(mid);if(!m||m.importId!==r.id)continue;m.kind=k;m.st=st;m.tags=tags;m.kindBy=kb;delete m.importId;ch.push(m)}if(ch.length)await saveMsgs(ch)}
+  if(u.ibMoved&&u.ibMoved.length)await ibUnarchive(u.ibMoved,u.ibId);
   if(u.moved&&u.moved.length){const ns=[];for(const x of u.moved){const n=S.nodes.get(x.id);if(n){n.parentId=x.parentId;n.order=x.order;ns.push(n)}}if(ns.length)await saveNodes(ns)}
   if(u.prevRun){const ns=[];for(const [id,v] of Object.entries(u.prevRun)){const n=S.nodes.get(id);if(n){if(v)n.mrun=v;else delete n.mrun;S.qa.delete(id);ns.push(n)}}if(ns.length)await saveNodes(ns);if(S.roomId)renderRoom(true)}
   if(u.prevRec){const ns=[];for(const [id,v] of Object.entries(u.prevRec)){const n=S.nodes.get(id);if(n){if(v)n.rec=v;else delete n.rec;ns.push(n)}}if(ns.length)await saveNodes(ns)}
@@ -2208,6 +2223,30 @@ async function ensureInbox(){let b=getInbox();if(b)return b;
   b={id:uid(),type:'room',parentId:null,name:'inbox',emoji:'📥',color:PALETTE[5],tags:[],badge:false,inbox:true,order:-1,createdAt:now(),lastAt:now()};
   await saveNode(b);return b}
 const isInbox=n=>!!(n&&n.inbox&&getInbox()===n);
+/* アーカイブinbox：整理したinboxのメモと、ビューから書いたメモの置き場。アーカイブ帯の中に住む */
+const getIbArch=()=>{let b=null;S.nodes.forEach(n=>{if(n.ibArch&&(!b||n.createdAt<b.createdAt))b=n});return b};
+async function ensureIbArch(){let b=getIbArch();if(b)return b;
+  b={id:uid(),type:'room',parentId:null,name:'アーカイブinbox',emoji:'🗃',color:PALETTE[6],tags:[],badge:false,ibArch:true,archived:true,order:-1,createdAt:now(),lastAt:now()};
+  await saveNode(b);return b}
+const isIbArch=n=>!!(n&&n.ibArch&&getIbArch()===n);
+const isSys=n=>isInbox(n)||isIbArch(n);
+/* inboxのメモに種類が付いたら、アーカイブinboxへ移す（直前の💡問いも一緒に） */
+async function ibAutoArchive(list){
+  const ib=getInbox();if(!ib)return [];
+  const mv=(list||[]).filter(m=>m&&m.roomId===ib.id&&m.kind&&m.by!=='ai');if(!mv.length)return [];
+  const qs=roomMsgs(ib.id).filter(x=>x.by==='ai');const all=[...mv];
+  for(const m of mv){const q=qs.find(x=>x.createdAt===m.createdAt-1);if(q)all.push(q)}
+  const a=await ensureIbArch();
+  all.forEach(m=>m.roomId=a.id);a.lastAt=Math.max(a.lastAt||0,...mv.map(m=>m.createdAt));
+  await saveMsgs(all);await saveNode(a);return all.map(m=>m.id);
+}
+async function ibUnarchive(ids,ibId){
+  const ib=S.nodes.get(ibId)||getInbox();if(!ib)return;
+  const ms=(ids||[]).map(id=>S.msgs.get(id)).filter(Boolean);ms.forEach(m=>m.roomId=ib.id);
+  if(ms.length)await saveMsgs(ms);renderList();renderRoom(true);
+}
+function ibMovedToast(ids,ibId){if(!ids.length)return;const n=ids.filter(id=>S.msgs.get(id)?.by!=='ai').length;
+  toast(`${n}件をアーカイブinboxへ移しました`,'元に戻す',()=>ibUnarchive(ids,ibId))}
 function navHTML(){
   const it=[['memo','💬','メモ'],['inbox','📥','inbox'],['data','📊','データ']];
   return `<nav class="bnav">${it.map(([k,ic,l])=>`<button class="${S.tab===k?'on':''}" data-act="tab" data-t="${k}"><span class="ic">${ic}</span>${l}</button>`).join('')}</nav>`;
@@ -2303,8 +2342,39 @@ function dvCardHTML(m){
   const r=S.nodes.get(m.roomId);const ai=m.by==='ai';
   return `<div class="lvc${ai?' ai':''}" data-act="dv" data-d="jump" data-id="${m.id}"><div class="lvh">${ai?'':`<span class="kc">${m.kind?kindText(m.kind):'未分類'}</span>`}${m.st?`<span class="sc ${m.st}">${STL[m.st]}</span>`:''}${m.pinned?'<span>📢</span>':''}<span class="rm">${r.archived?'🗄 ':''}${r.docs?'📌 ':''}${esc(r.name)} · ${fmtTime(m.createdAt)}</span></div><div class="lvt">${esc((m.text||'📷 画像').slice(0,300))}</div></div>`;
 }
+function dvBubHTML(m){
+  const ai=m.by==='ai';const chips=ai?'':msgChips(m);
+  return `<div class="dvm${ai?' ai':''}" data-act="dv" data-d="jump" data-id="${m.id}"><div class="bub${ai?' ai':''}${m.exportedAt?' done':''}">${m.text?linkify(m.text):'📷 画像'}</div>${ai?'':`<div class="meta">${chips}${m.fromView?'<span>🗃</span>':''}<span>${hm(m.createdAt)}</span></div>`}</div>`;
+}
+/* ビューの条件から、書いたメモに付ける印を決める（決まらないものは付けない） */
+function dvMarks(v,gv){
+  const f=v.f,o={tags:[]};let amb=false;
+  if(v.group==='kind'&&gv!=null){if(gv!=='none')o.kind=gv}
+  else if(f.kinds.length===1){if(f.kinds[0]!=='none')o.kind=f.kinds[0]}else if(f.kinds.length>1&&!f.kinds.includes('none'))amb=true;
+  if(f.sts.length===1){if(f.sts[0]!=='none')o.st=f.sts[0]}else if(f.sts.length>1&&!f.sts.includes('none'))amb=true;
+  if(v.group==='tag'&&gv&&gv!=='__none')o.tags.push(gv);
+  if(f.tag&&!o.tags.includes(f.tag))o.tags.push(f.tag);
+  if(f.pin)o.pinned=true;
+  o.amb=amb;return o;
+}
+function dvMarkText(v,gv){const o=dvMarks(v,gv);const a=[];if(o.kind)a.push(kindText(o.kind));if(o.st)a.push(STL[o.st]);o.tags.forEach(t=>a.push('#'+t));if(o.pinned)a.push('📢');
+  return a.length?'書くと '+a.join(' ')+' で保存':'書くと印なしで保存'}
+const dvCanWrite=v=>!(v.group==='digest'||v.f.docsOnly);
+async function dvSend(){
+  const D=S.dv,v=D.v;const ta=$('#dvta');if(!v||!ta)return;const text=ta.value.replace(/\s+$/,'');if(!text.trim())return;
+  const o=dvMarks(v,D.mode==='room'?D.gv:null);const a=await ensureIbArch();const t=now();
+  const m={id:uid(),roomId:a.id,text,images:[],createdAt:t,exportedAt:null,exportId:null,fromView:true};
+  if(o.kind){m.kind=o.kind;m.kindBy='me'}if(o.st){m.st=o.st;m.kindBy='me'}if(o.tags.length)m.tags=o.tags;if(o.pinned)m.pinned=true;
+  await saveMsg(m);a.lastAt=t;await saveNode(a);
+  ta.value='';D.draft='';renderList();
+  const c=$('#dvchat');if(c)c.scrollTop=c.scrollHeight;
+  const shown=dvRoomMsgs(v,D.gv).some(x=>x.id===m.id);
+  if(!shown)toast('アーカイブinboxに保存しました（このビューの条件には合いません）');else hintOnce('dvSend','ここで書いたメモは、印を付けてアーカイブinboxに入ります');
+  if(!isTouch())$('#dvta')?.focus();
+}
 function renderData(P){
-  const D=S.dv;let body='',head='';
+  const D=S.dv;let body='',head='',chat=null;
+  const foc=document.activeElement&&document.activeElement.id==='dvta';const dta=$('#dvta');if(dta)D.draft=dta.value;
   if(D.mode==='home'||!D.v){
     const saved=dvSaved(),fav=saved.filter(v=>v.fav);
     const row=(v,ic)=>`<div class="dvrow" data-act="dv" data-d="open" data-id="${esc(v.id)}"><span class="ic">${ic||(v.gv!=null?'💬':'🗂')}</span><div class="t">${esc(v.name)}<small>${DV_GROUPS.find(x=>x[0]===v.group)?.[1]||''}${v.gv!=null?' › '+esc(dvLabel(v.group,v.gv)):''}</small></div>${v.id.startsWith('p:')?'':`<button class="dvfav${v.fav?' on':''}" data-act="dv" data-d="fav" data-id="${esc(v.id)}">${v.fav?'★':'☆'}</button>`}</div>`;
@@ -2316,9 +2386,11 @@ function renderData(P){
     const v=D.v,gv=D.gv;const inRoom=D.mode==='room';
     const saved=v.id&&!v.id.startsWith('p:');
     if(inRoom){
-      const ms=dvRoomMsgs(v,gv);let day='';
-      body=`${dvFilterHTML(v)}<div class="stat"><b>${ms.length}</b>件 <span class="dvnote">条件で引いて表示。編集は元のトークで</span></div>`
-        +(ms.map(m=>{const d=ymd(m.createdAt);let h='';if(d!==day){day=d;h=`<div class="dvday">${dayLabel(m.createdAt)}</div>`}return h+dvCardHTML(m)}).join('')||'<div class="empty" style="padding:30px">条件に合うメモがありません</div>');
+      const ms=dvRoomMsgs(v,gv);let day='',prev='';
+      chat=(D.showF?dvFilterHTML(v):'')+`<div class="dvcount">${ms.length}件 · ${dvMarkText(v,gv)}</div>`
+        +(ms.map(m=>{const d=ymd(m.createdAt);let h='';if(d!==day){day=d;prev='';h=`<div class="daysep"><span>${dayLabel(m.createdAt)}</span></div>`}
+          const r=S.nodes.get(m.roomId);if(r&&r.id!==prev){prev=r.id;h+=`<div class="dvsrc${m.by==='ai'?' ai':''}" data-act="dv" data-d="jump" data-id="${m.id}">${r.ibArch?'🗃':r.docs?'📌':r.archived?'🗄':'💬'} ${esc(r.name)} ›</div>`}
+          return h+dvBubHTML(m)}).join('')||'<div class="roomempty"><div>条件に合うメモがありません<br><span style="font-size:11.5px">下から書くと、このビューの印を付けて保存します</span></div></div>');
     }else{
       const gs=dvGroups(v);
       body=`${dvFilterHTML(v)}<div class="dvh">${DV_GROUPS.find(x=>x[0]===v.group)[1]}</div><div class="dvgrp">${DV_GROUPS.filter(x=>x[0]!=='none').map(([id,l])=>`<span class="chip ${v.group===id?'in':''}" data-act="dv" data-d="group" data-v="${id}">${l}</span>`).join('')}<span class="chip" data-act="dv" data-d="group" data-v="none">まとめて1室</span></div>`
@@ -2326,11 +2398,23 @@ function renderData(P){
     }
     head=`<div class="top"><button class="icon" data-act="dv" data-d="back" title="戻る">${ICONS.back}</button>
       <div class="ttl"><div class="tx"><div class="nm">${esc(dvTitle(v,inRoom?gv:null))}</div><div class="sb">${inRoom?'抽出ルーム':'ビュー'}${saved?'':' · 未保存'}</div></div></div>
+      ${inRoom?`<button class="icon dvfbtn${D.showF?' on':''}" data-act="dv" data-d="showF" title="絞り込み">⚲${dvFCount(v)?`<i>${dvFCount(v)}</i>`:''}</button>`:''}
       <button class="icon dvfavb${v.fav?' on':''}" data-act="dv" data-d="${saved?'favcur':'save'}" title="${saved?'お気に入り':'ビューを保存'}">${saved?(v.fav?'★':'☆'):'💾'}</button>
       <button class="icon" data-act="dv" data-d="menu" title="メニュー">${ICONS.more}</button></div>`;
   }
+  if(chat!=null){
+    const w=dvCanWrite(D.v);
+    P.innerHTML=head+`<div class="chat dvchat" id="dvchat">${chat}</div>`+(w?`<div class="composer"><div class="crow"><textarea id="dvta" rows="1" placeholder="${esc(dvMarkText(D.v,D.gv))}"></textarea><button class="send" id="dvsend" data-act="dv" data-d="send" title="送信">${ICONS.send}</button></div></div>`:`<div class="dvro">資料のビューは見るだけです</div>`)+navHTML();
+    const c=$('#dvchat');c.scrollTop=c.scrollHeight;hydrate&&hydrate(c);
+    const ta=$('#dvta');if(ta){ta.value=D.draft||'';autoGrow(ta);const upd=()=>{$('#dvsend').disabled=!ta.value.trim()};upd();
+      ta.addEventListener('input',()=>{D.draft=ta.value;autoGrow(ta);upd()});
+      ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229&&!isTouch()){e.preventDefault();dvSend()}});
+      if(foc)ta.focus()}
+    return;
+  }
   P.innerHTML=head+`<div class="scroll" id="dataScroll"><div class="lvhost">${body}</div></div>`+navHTML();
 }
+const dvFCount=v=>(v.f.range?1:0)+v.f.kinds.length+v.f.sts.length+(v.f.tag?1:0);
 async function dvPersist(v){ // 保存済みビューの変更を反映
   if(!v.id||v.id.startsWith('p:'))return;
   const a=dvSaved().map(x=>x.id===v.id?{id:v.id,name:v.name,group:v.group,f:v.f,fav:!!v.fav,gv:v.gv}:x);dvSaveAll(a);
@@ -2350,7 +2434,7 @@ function dvAct(el,e){
     case 'open':{const id=el.dataset.id;const sv=id.startsWith('p:')?DV_PRESETS.find(x=>x.id===id):dvSaved().find(x=>x.id===id);if(!sv)break;
       D.v=clone(sv);D.v.f=dvF(D.v.f);if(sv.gv!=null){D.gv=sv.gv;D.mode='room'}else{D.gv=null;D.mode='groups'}
       if(id.startsWith('p:')&&D.v.group==='none'){D.mode='room';D.gv=null}renderList();break}
-    case 'room':D.gv=el.dataset.v;D.mode='room';renderList();break;
+    case 'room':D.gv=el.dataset.v;D.mode='room';D.draft='';D.showF=false;renderList();break;
     case 'back':if(D.mode==='room'&&D.v.group!=='none'&&!(D.v.gv!=null)){D.mode='groups';D.gv=null}else{D.mode='home';D.v=null;D.gv=null}renderList();break;
     case 'group':if(v){detach();v.group=el.dataset.v;if(v.group==='digest')v.f.docsOnly=true;else if(v.f.docsOnly&&!(v.id&&v.id.startsWith('p:digest')))v.f.docsOnly=false;D.gv=null;D.mode=v.group==='none'?'room':'groups';touchF()}break;
     case 'range':if(v){detach();v.f.range=el.dataset.v;touchF()}break;
@@ -2362,6 +2446,8 @@ function dvAct(el,e){
     case 'save':{if(D.mode==='room'&&D.gv!=null&&v.group!=='none')menuSheet('ビューを保存',[
         {icon:'🗂',label:'このビュー全体を保存',sub:'束ね方とフィルタを保存',fn:()=>dvSaveCur(false)},
         {icon:'💬',label:'この抽出ルームだけ保存',sub:`「${dvLabel(v.group,D.gv)}」を直接開く`,fn:()=>dvSaveCur(true)}]);else dvSaveCur(false);break}
+    case 'send':dvSend();break;
+    case 'showF':D.showF=!D.showF;renderList();break;
     case 'jump':{const m=S.msgs.get(el.dataset.id);if(m)openRoom(m.roomId,m.id);break}
     case 'search':listView();break;
     case 'menu':{if(!v)break;const ms=D.mode==='room'?dvRoomMsgs(v,D.gv):lvCollect(v.f);const l=ms.filter(m=>m.by!=='ai');
