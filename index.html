@@ -1430,6 +1430,7 @@ function settings(){
       <button data-m="history"><span class="ic">🕘</span><span>書き出し履歴</span></button>
       <button data-m="import"><span class="ic">📥</span><span>AIの結果を取り込む<span class="sub">取り込みの履歴・取り消しもここから</span></span></button>
       <button data-m="trash"><span class="ic">🗑</span><span>ごみ箱<span class="sub">消したものは90日間ここから戻せます</span></span></button>
+      <button data-m="sample"><span class="ic">🧪</span><span>テスト用サンプルを入れる<span class="sub">新しい機能を一通り試せるフォルダを追加（今のメモには触りません）</span></span></button>
     </div>`);
   {let n=0,t=0;sh.querySelector('h3').onclick=()=>{const x=now();n=x-t<1500?n+1:1;t=x;if(n>=5){n=0;qStatsCopy()}}}
   sh.querySelector('[data-m=sync]').onclick=()=>{closeSheet();syncSheet()};
@@ -1438,6 +1439,7 @@ function settings(){
   sh.querySelector('[data-m=history]').onclick=()=>{closeSheet();historySheet()};
   sh.querySelector('[data-m=import]').onclick=()=>{closeSheet();importSheet()};
   sh.querySelector('[data-m=trash]').onclick=()=>{closeSheet();trashSheet()};
+  sh.querySelector('[data-m=sample]').onclick=()=>{closeSheet();seedTest()};
 }
 async function backup(){
   toast('バックアップを作っています…');
@@ -2243,6 +2245,58 @@ function folderCounts(n){
   return `<span class="fcnt">${r?`💬${r}`:''}${f?` 📁${f}`:''}${a?` 🗄${a}`:''}${qt?` <b>✅${qa}/${qt}</b>`:''}</span>`;
 }
 
+/* ---------- テスト用サンプル（新機能を一通り触れる） ---------- */
+async function seedTest(){
+  const t=now(),D=86400000,H=3600000;const N=[],M=[];let k=0;
+  const node=(o)=>{const n=Object.assign({id:uid(),tags:[],emoji:'',color:PALETTE[N.length%7],order:N.length,createdAt:t-5*D},o);if(n.type==='room'){n.badge=n.badge??true;n.lastAt=n.lastAt||n.createdAt}N.push(n);return n};
+  const msg=(r,text,o={})=>{const at=o.at||t-3*D+(++k)*60000;const m=Object.assign({id:uid(),roomId:r.id,text,images:[],createdAt:at,exportedAt:null,exportId:null},o);delete m.at;M.push(m);r.lastAt=Math.max(r.lastAt||0,at);return m};
+  const top=node({type:'folder',parentId:null,name:'テスト用サンプル',emoji:'🧪',color:PALETTE[3],order:-0.5,sample:true});
+  // 1) 分類・状態・タグ・アナウンス・書き出し済み
+  const r1=node({type:'room',parentId:top.id,name:'分類いろいろ',fav:true});
+  msg(r1,'📢 このトークの約束：思いついたら即メモ。整理はあとで。',{pinned:true});
+  msg(r1,'ログイン画面のボタン色を直す',{kind:'task',st:'draft',kindBy:'me'});
+  msg(r1,'週次ミーティングの議事録をまとめる #仕事',{kind:'task',st:'done',kindBy:'me'});
+  msg(r1,'通知を「行動のきっかけ」にできないか #アイデア',{kind:'idea',kindBy:'ai',tags:['通知']});
+  msg(r1,'なぜユーザーは2日目に来なくなるんだろう？',{kind:'question'});
+  msg(r1,'今日のカフェは静かで集中できた',{kind:'log'});
+  msg(r1,'Supabaseの無料枠は2プロジェクトまで #メモ',{kind:'info',st:'fixed',kindBy:'me'});
+  msg(r1,'このUI、正直ちょっとワクワクする',{kind:'feeling'});
+  msg(r1,'書き出し済みのメモ（AIに渡した印が付く）',{exportedAt:t-D,exportId:'sample'});
+  msg(r1,'分類なし・タグなしの普通のメモ');
+  // 2) 思考法：5Why（途中まで答えてある）
+  const r2=node({type:'room',parentId:top.id,name:'朝起きられない｜5Why',qroom:true,mrun:{mid:'M1',pos:2}});
+  msg(r2,'何が起きてる？',{by:'ai',mid:'M1'});msg(r2,'目覚ましを止めて二度寝してる');
+  msg(r2,'それはなぜ？',{by:'ai',mid:'M1'});msg(r2,'夜ふかししてるから');
+  // 3) 思考法：SWOT（枠ごとに部屋）
+  const f3=node({type:'folder',parentId:top.id,name:'新しいアプリ'});
+  const r3a=node({type:'room',parentId:f3.id,name:'新しいアプリ',order:0});msg(r3a,'元のトーク（自由メモとして使う）');
+  [['強み','強みは？'],['弱み','弱みは？'],['追い風','追い風は？'],['向かい風','向かい風は？']].forEach(([lb,q],i)=>{const r=node({type:'room',parentId:f3.id,name:`SWOT｜${lb}`,order:i+1,qroom:true,mrun:{mid:'M20',pos:0,steps:[q]}});
+    if(i===0){msg(r,q,{by:'ai',mid:'M20'});msg(r,'1人で速く作れる');delete r.mrun}});
+  // 4) ブレスト（AIの取り込み結果の形）
+  const f4=node({type:'folder',parentId:top.id,name:'週末の過ごし方',emoji:'🧠',color:PALETTE[3]});
+  node({type:'room',parentId:f4.id,name:'自由メモ',emoji:'📝',color:PALETTE[6],order:0});
+  node({type:'room',parentId:f4.id,name:'お金をかけずに楽しむ',order:1,qroom:true,mrun:{mid:'AI',pos:0,steps:['最近いちばん楽しかった無料のことは？','近所でまだ行ってない場所は？','誰と過ごすと楽しい？']}});
+  node({type:'room',parentId:f4.id,name:'体を休める',order:2,qroom:true,mrun:{mid:'AI',pos:0,steps:['疲れが取れたと感じた日は何をしてた？','休みの日にやめたいことは？']}});
+  // 5) AIのおすすめ付き
+  const r5=node({type:'room',parentId:top.id,name:'転職するか迷ってる',rec:[{m:'M2',why:'感情が強く出ている'},{m:'M9',why:'長期で見ると変わりそう'},{m:'M4',why:'選択肢が2つある'}]});
+  msg(r5,'今の会社、悪くはないけど成長してる感じがしない');msg(r5,'でも辞めるのは怖い');
+  // 6) 問いかけ（💡）で答えたあと
+  const r6=node({type:'room',parentId:top.id,name:'💡問いかけの例'});
+  msg(r6,'最近ちょっと嬉しかったことは？',{by:'ai',qid:32});msg(r6,'友達がアプリを褒めてくれた');
+  msg(r6,'5分でできる次の一歩は？',{by:'ai',qid:166});msg(r6,'スクショを撮って送る');
+  // 7) 資料（AIのまとめ）とアーカイブ
+  const r7=node({type:'room',parentId:top.id,name:'資料',docs:true,emoji:'📚'});
+  msg(r7,'【旅行の準備のまとめ】\n・持ち物：充電器、常備薬\n・予約：ホテルは済み、レンタカーはまだ',{kind:'info',kindBy:'ai',aiMade:true});
+  const r8=node({type:'room',parentId:top.id,name:'旅行の準備（済み）',archived:true});
+  msg(r8,'ホテル予約した');msg(r8,'レンタカーも予約した');
+  // 8) inbox（まだ無いときだけ）
+  let ib=getInbox();const newInbox=!ib;
+  if(newInbox){ib=await ensureInbox();msg(ib,'今、頭を占めてることは？',{by:'ai',qid:1,at:t-2*H});msg(ib,'来週のプレゼンの構成',{at:t-2*H+1000});msg(ib,'牛乳買う',{at:t-H})}
+  await saveNodes(N.concat(newInbox?[ib]:[]));await saveMsgs(M);
+  await normalizeOrders();S.cwd=null;renderList();
+  toast('「テスト用サンプル」を追加しました。いらなくなったらフォルダごとごみ箱へ');
+}
+
 /* =========================================================
    NAV & EVENTS
    ========================================================= */
@@ -2443,7 +2497,8 @@ async function stackFolder(a,b){
 }
 
 /* sample */
-async function seed(){
+async function seed(){await seedBase();await seedTest()}
+async function seedBase(){
   const t=now();const D=86400000;
   const f1={id:uid(),type:'folder',parentId:null,name:'アイデア',emoji:'💡',color:PALETTE[4],tags:['思考'],createdAt:t-5*D};
   const r1={id:uid(),type:'room',parentId:f1.id,name:'NSNS',emoji:'',color:PALETTE[0],tags:[],badge:true,createdAt:t-5*D};
