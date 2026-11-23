@@ -1,9 +1,10 @@
-const CACHE='nsns-shell-v3';
+const CACHE='nsns-shell-v4';
 const ASSETS=['/','/index.html','/manifest.webmanifest','/icon.svg','/icon-192.png','/icon-512.png','/apple-touch-icon.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('nsns-shell-')&&k!==CACHE).map(k=>caches.delete(k)))),self.clients.claim()])));
 self.addEventListener('fetch',e=>{
  const r=e.request;if(r.method!=='GET'||new URL(r.url).origin!==self.location.origin)return;
+ if(new URL(r.url).searchParams.has('_v'))return; // 新しい版の確認は、控えを通さず直接取りに行く（控えにも残さない）
  if(r.mode==='navigate'){
   // オンラインなら最新を表示し、その最新版でオフライン用の控えも上書きする
   e.respondWith(fetch(r).then(res=>{

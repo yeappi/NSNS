@@ -367,6 +367,8 @@ details.adv .in{padding:0 14px 14px}
 #toast{position:fixed;left:50%;bottom:calc(96px + var(--safe-b));transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:16px;font-size:13px;opacity:0;pointer-events:none;transition:.22s;z-index:80;display:flex;gap:14px;align-items:center;max-width:90vw}
 body:has(.backdrop) #toast{bottom:auto;top:calc(14px + env(safe-area-inset-top,0px));z-index:120}
 #toast{width:max-content}
+#verbar{position:fixed;left:50%;top:calc(10px + var(--safe-t));transform:translateX(-50%);z-index:90;background:var(--ink);color:#fff;border-radius:16px;padding:8px 8px 8px 16px;display:flex;align-items:center;gap:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.2);width:max-content;max-width:92vw}
+#verbar button{background:var(--accent);color:#fff;border-radius:10px;padding:6px 14px;font-weight:600;font-size:13px}#verbar .x{background:none;padding:6px 8px;color:rgba(255,255,255,.6);font-weight:400}
 #toast.show{opacity:1;transform:translateX(-50%);pointer-events:auto}
 #toast.top{bottom:auto;top:calc(16px + var(--safe-t));transform:translateX(-50%) translateY(-20px)}
 #toast.top.show{transform:translateX(-50%)}
@@ -3624,6 +3626,21 @@ async function syncSheet(){
   sh.querySelector('[data-m=out]').onclick=async()=>{closeSheet();await SYNC.logout();toast('ログアウトしました')};
 }
 
+/* 新しい版の知らせ：開いている間に本番が更新されたら「更新」を出す（押すまで何も変えない） */
+function verHash(t){let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return t.length+':'+h}
+async function verFetch(){const r=await fetch('/index.html?_v='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;return verHash(await r.text())}
+function verWatch(){
+  if(!/^https?:$/.test(location.protocol)||location.protocol==='file:')return;
+  let base=null,shown=false,last=0;
+  const show=()=>{if(shown)return;shown=true;const b=document.createElement('div');b.id='verbar';
+    b.innerHTML='<span>新しい版があります</span><button>更新</button><button class="x" aria-label="閉じる">×</button>';
+    b.querySelector('button').onclick=()=>location.reload();b.querySelector('.x').onclick=()=>b.remove();document.body.appendChild(b)};
+  const check=async()=>{if(shown||document.hidden||!navigator.onLine||Date.now()-last<20000)return;last=Date.now();
+    try{const h=await verFetch();if(base===null)base=h;else if(h!==base)show()}catch(e){}};
+  check();
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)check()});
+  setInterval(check,10*60*1000);
+}
 (async()=>{
   await DB.open();
   await SQ.open();
@@ -3632,7 +3649,7 @@ async function syncSheet(){
   await purgeTrash(x=>x.deletedAt<now()-90*86400000);
   await normalizeOrders();
   await loadPhotos();
-  renderList();renderRoom();aiPendRefresh();
+  renderList();renderRoom();aiPendRefresh();verWatch();
   SYNC.start();
   if (!document.activeElement || !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) window.scrollTo(0,0);
 })();
