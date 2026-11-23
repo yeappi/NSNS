@@ -21,7 +21,7 @@
 :root{
   --bg:#FBF9F6; --card:#FFFFFF; --ink:#2F2B27; --sub:#857E76; --faint:#B0A89F; --line:#EEE9E3;
   --accent:#EC8C69; --accent-soft:#FDEDE5; --accent-ink:#B0573A;
-  --chat:#F5F1EC; --bub-me:#FFE6D9; --bub-done:#EEE9E2;
+  --chat:#F5F1EC; --bub-me:#FFFFFF; --bub-done:#EEE9E2;
   --shadow:0 1px 2px rgba(60,40,20,.05),0 6px 24px rgba(60,40,20,.06);
   --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
 }
@@ -110,7 +110,7 @@ body.dragging-on,body.dragging-on *{cursor:grabbing!important}
 .item .pv{font-size:12.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 .item .rt{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none;min-width:34px}
 .item .tm{font-size:11px;color:var(--sub)}
-.badge{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
+.badge{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#EDE7E0;color:#6d655d;font-size:11px;font-weight:700;display:grid;place-items:center}
 .item .more{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:10px;opacity:0;display:grid;place-items:center;background:var(--card);box-shadow:var(--shadow);color:var(--sub);pointer-events:none}
 .item .more svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}
 @media (hover:hover) and (pointer:fine){.item:hover .more{opacity:1;pointer-events:auto}.item:hover .rt{opacity:0}}
@@ -149,10 +149,36 @@ body.dragging-on,body.dragging-on *{cursor:grabbing!important}
 .loadmore{text-align:center;margin:10px 0}
 .loadmore button{font-size:12px;color:var(--sub);background:rgba(255,255,255,.7);padding:5px 14px;border-radius:12px}
 .daysep{text-align:center;margin:18px 0 10px}
+ #pastebar{position:fixed;left:12px;right:12px;bottom:calc(76px + var(--safe-b));z-index:40;background:var(--ink);color:#fff;border-radius:16px;padding:10px 10px 10px 14px;display:flex;align-items:center;gap:10px;font-size:13.5px;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:560px;margin:0 auto}
+#pastebar .t{flex:1;min-width:0;cursor:pointer}#pastebar small{display:block;font-size:11px;opacity:.7}
+#pastebar button{background:var(--accent);color:#fff;border-radius:10px;padding:7px 12px;font-size:13px;font-weight:600;flex:none}
+body:has(.backdrop) #pastebar{display:none}
+body:has(#pastebar) #listPane .fab{bottom:calc(144px + var(--safe-b))}
+.shead .exback{font-size:30px;line-height:1;color:var(--ink);padding:0 12px 4px 2px}
+.exscope{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--sub);margin:0 2px 12px}.exscope b{color:var(--ink)}.exscope button{color:var(--accent-ink);font-size:13px}
+.exbig{display:flex;gap:14px;align-items:center;width:100%;background:var(--card);border-radius:18px;padding:14px 16px;margin-bottom:10px;text-align:left;box-shadow:0 1px 2px rgba(60,40,20,.05)}
+.exbig .e{width:46px;height:46px;flex:none;border-radius:14px;display:grid;place-items:center;font-size:23px;background:var(--chat)}
+.exbig .t{font-weight:700;font-size:15.5px;display:flex;flex-direction:column}.exbig small{font-weight:400;font-size:12.5px;color:var(--sub);margin-top:2px;line-height:1.45}
+.exbig.pri{background:var(--accent);color:#fff}.exbig.pri small{color:rgba(255,255,255,.88)}.exbig.pri .e{background:rgba(255,255,255,.22)}
+.exbig:disabled{opacity:.45}
+.exsm{display:flex;flex-wrap:wrap;gap:8px}.exsm button{background:var(--card);border-radius:12px;padding:8px 12px;font-size:13px;color:#4a443e;display:flex;gap:6px;align-items:center}
+.exsm i{font-style:normal;font-size:11px;color:var(--faint)}.exsm button:disabled{opacity:.4}
+.actrow{display:flex;justify-content:space-around;gap:6px;margin:2px 0 14px}
+.actrow button{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:#4a443e}
+.actrow i{width:52px;height:52px;border-radius:16px;background:var(--card);display:grid;place-items:center;font-style:normal;box-shadow:0 1px 2px rgba(60,40,20,.05)}
+.actrow i svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.actrow .danger{color:#C9583F}
+.moreb{display:flex;align-items:center;gap:10px;width:100%;background:var(--card);border-radius:14px;padding:13px 14px;font-size:14px;margin-top:8px;text-align:left}
+.moreb span{flex:1;font-size:12px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.moreb b{color:var(--faint);font-weight:400}
+.mprev{background:var(--card);border-radius:14px;padding:10px 14px;font-size:14px;margin-bottom:14px;color:#4a443e;max-height:4.8em;overflow:hidden;white-space:pre-wrap}
+.icon.tidyb.on{background:var(--ink);color:#fff}
+.tchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;white-space:normal}
+.tchips button{font-size:11.5px;line-height:1.5;border-radius:8px;padding:1px 8px;background:#F3EEE8;color:#6d655d;font-weight:500}
+.tchips .k{background:#EAF1F7;color:#3D6A8F}.tchips .s{background:#EEF4EA;color:#4F7A3C}.tchips .s.fixed{background:#DCE8F5;color:#4A6C92}.tchips .s.done{background:#EEE9E2;color:#8A8177}
+.tchips .add{background:transparent;border:1px dashed #D9D0C6;color:var(--faint)}.tchips .ex{background:transparent;color:#7FA68C}
 .daysep span{font-size:11px;color:var(--sub);background:rgba(255,255,255,.75);padding:3px 12px;border-radius:10px}
 .msg{display:flex;flex-direction:column;align-items:flex-end;margin:4px 0 4px 52px;position:relative}
 .msg .line{display:flex;align-items:flex-end;gap:6px;max-width:100%;justify-content:flex-end}
-.bub{background:var(--bub-me);border-radius:18px 18px 6px 18px;padding:9px 13px;white-space:pre-wrap;word-break:break-word;max-width:min(560px,100%);font-size:14.5px;line-height:1.65;transition:background .2s, box-shadow .15s}
+.bub{box-shadow:0 1px 1px rgba(60,40,20,.04);background:var(--bub-me);border-radius:18px 18px 6px 18px;padding:9px 13px;white-space:pre-wrap;word-break:break-word;max-width:min(560px,100%);font-size:14.5px;line-height:1.65;transition:background .2s, box-shadow .15s}
 .bub.done{background:var(--bub-done);color:#5F5850}
 .bub.onlyimg{padding:4px}
 .bub .ht{color:var(--accent-ink);font-weight:500}
@@ -517,6 +543,8 @@ body:has(.backdrop) #toast{bottom:auto;top:calc(14px + env(safe-area-inset-top,0
 #exSimple{padding:0 2px 20px}
 .dvfixed{flex:none;padding:0 12px;max-height:46vh;overflow-y:auto;border-bottom:1px solid var(--line)}
 .dvfixed .dvf{margin:6px 0}
+.dvsum{display:flex;gap:6px;align-items:center;overflow:hidden;padding:6px 0;cursor:pointer}
+.dvsum span{font-size:12px;background:var(--card);border-radius:12px;padding:3px 10px;white-space:nowrap;color:#4a443e}.dvsum b{margin-left:auto;font-size:12px;color:var(--accent-ink);font-weight:500;white-space:nowrap}
 .dvq{margin:0!important}
 .dvbar{display:flex;align-items:center;gap:6px;margin:6px 0;padding:7px 8px 7px 12px;border-radius:12px;background:#FFF4E2;color:#7A5A2E;font-size:13px}
 .dvbar span{flex:1}.dvbar button{padding:5px 10px;border-radius:10px;background:rgba(255,255,255,.8);color:#7A5A2E;font-size:12px;font-weight:500}
@@ -561,6 +589,8 @@ const PALETTE=['#F9D9CB','#DCEBD4','#D6E3F3','#EADFF3','#F6E8BC','#D2EBE7','#F5D
 const EMOJIS=['💡','📝','📔','🗺','🧠','🌱','🎮','🎨','📚','💬','⭐','🔥','🌙','☕','🎵','📷','💼','🏠','❤️','🛠','✈️','🍳','💰','🐈'];
 const IC=(d,w)=>`<svg viewBox="0 0 24 24">${d}</svg>`;
 const ICONS={
+  bmk:IC('<path d="M6 3h12v18l-6-4-6 4z"/><path d="M12 7v6M9 10h6"/>'),
+  tidy:IC('<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/>'),
   search:IC('<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>'),
   gear:IC('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'),
   back:IC('<path d="M15 18l-6-6 6-6"/>'),
@@ -658,7 +688,7 @@ const DB={
 };
 
 /* ---------------- state & index ---------------- */
-const S={nodes:new Map(),msgs:new Map(),tnodes:new Map(),tmsgs:new Map(),lsel:null,swiped:null,exports:new Map(),presets:new Map(),cwd:null,roomId:null,search:'',searchOpen:false,pending:[],urls:new Map(),sel:null,win:200,jump:null};
+const S={nodes:new Map(),msgs:new Map(),tnodes:new Map(),tmsgs:new Map(),lsel:null,swiped:null,exports:new Map(),presets:new Map(),cwd:null,roomId:null,search:'',searchOpen:false,pending:[],urls:new Map(),sel:null,win:200,jump:null,tidy:LS.get('tidy',false)};
 let VER=0,IDX=null;const bump=()=>{VER++};
 function idx(){
   if(IDX&&IDX.v===VER)return IDX;
@@ -791,7 +821,6 @@ function renderList(){
   }else{
     head=`<div class="top"><div class="brand">NSNS <small>Not SNS</small></div>
       <button class="icon" data-act="toggleSearch" title="検索">${ICONS.search}</button>
-      ${selBtn}
       <button class="icon" data-act="exportHere" title="書き出す">${ICONS.out}</button>
       <button class="icon" data-act="settings" title="設定">${ICONS.gear}</button></div>`;
   }
@@ -809,7 +838,7 @@ function renderList(){
   if(D.active)drawUpbar();
 }
 function backupReminder(){
-  if(S.cwd||S.searchOpen||S.msgs.size<10)return '';
+  if(S.cwd||S.searchOpen||S.msgs.size<40)return '';
   const last=LS.get('lastBackup',0),snooze=LS.get('backupSnooze',0);
   if(now()<snooze)return '';
   if(last&&now()-last<7*86400000)return '';
@@ -858,7 +887,7 @@ function itemHTML(n,o={}){
   else if(n.type==='room'){const ms=roomMsgs(n.id);const l=ms[ms.length-1];pv=l?((l.text||'').replace(/\n/g,' ')||'📷 画像'):'まだメモがありません';t=n.lastAt}
   else{const r=latestRoom(n.id);if(r){const ms=roomMsgs(r.id);const l=ms[ms.length-1];pv=r.name+'：'+(l?((l.text||'').replace(/\n/g,' ')||'📷 画像'):'—')}else pv=kids(n.id).length?`${kids(n.id).length}件`:'からっぽ';t=lastAt(n)}
   if(o.path){const a=ancestors(n.id).map(x=>x.name);if(a.length&&!o.msg)pv=a.join(' › ')+'　'+pv}
-  const un=o.msg?0:badgeCount(n);
+  const un=o.msg||n.type==='folder'?0:badgeCount(n);
   const sel=!!S.lsel&&!o.msg;
   const tg=n.tags||[];
   const tags=tg.length?`<span class="tgs">${tg.slice(0,2).map(x=>`<span>#${esc(x)}</span>`).join('')}${tg.length>2?`<span>+${tg.length-2}</span>`:''}</span>`:'';
@@ -897,7 +926,8 @@ function renderRoom(keepScroll){
   }else{
     head=`<div class="top">
       <button class="icon only-mobile" data-act="closeRoom">${ICONS.back}</button>
-      <div class="ttl">${avatar(r,true)}<div class="tx"><div class="nm">${esc(r.name.split('｜')[0])}</div><div class="sb">${r.name.includes('｜')?`<b class="mth">${esc(r.name.split('｜').slice(1).join('｜'))}</b> · `:''}${esc(path||'ホーム')}</div></div></div>
+      <div class="ttl">${avatar(r,true)}<div class="tx"><div class="nm">${esc(r.name.split('｜')[0])}</div><div class="sb">${S.tidy?(()=>{const u=roomMsgs(r.id).filter(m=>m.by!=='ai'&&!m.kind).length;return `整理モード${u?` · 未分類 ${u}件`:' · すべて分類済み'}`})():`${r.name.includes('｜')?`<b class="mth">${esc(r.name.split('｜').slice(1).join('｜'))}</b> · `:''}${esc(path||'ホーム')}`}</div></div></div>
+      <button class="icon tidyb${S.tidy?' on':''}" data-act="tidy" title="整理モード（種類・状態・タグを表示）">${ICONS.tidy}</button>
       <button class="icon" data-act="exportRoom" title="書き出す">${ICONS.out}</button>
       <button class="icon" data-act="nodeMenu" data-id="${r.id}" title="メニュー">${ICONS.more}</button></div>`;
     bottom=`<div class="composer">
@@ -941,23 +971,24 @@ function renderChat(toBottom){
   if(S.jump){const i=all.findIndex(m=>m.id===S.jump);if(i>=0)S.win=Math.max(S.win,all.length-i+10)}
   const start=Math.max(0,all.length-S.win);const ms=all.slice(start);
   let html=start?`<div class="loadmore"><button data-act="loadMore">以前のメモを表示（あと${start}件）</button></div>`:'';
-  let lastDay='';
+  let lastDay='';const T=!!S.tidy;const perDay={};ms.forEach(m=>{const d=ymd(m.createdAt);perDay[d]=(perDay[d]||0)+1});
   ms.forEach((m,i)=>{
-    const d=ymd(m.createdAt);if(d!==lastDay){html+=`<div class="daysep"><span>${dayLabel(m.createdAt)}</span></div>`;lastDay=d}
+    const d=ymd(m.createdAt);const lone=perDay[d]<2;if(d!==lastDay){if(!lone||i===0)html+=`<div class="daysep"><span>${dayLabel(m.createdAt)}</span></div>`;lastDay=d}
     const nx=ms[i+1];
     if(m.by==='ai'){
       html+=`<div class="msg ai${S.sel&&S.sel.has(m.id)?' sel':''}" data-act="tapMsg" data-id="${m.id}" data-lpm="${m.id}">
         <div class="line"><div class="bub ai${m.qid?' q':m.mid?' m':''}">${linkify(m.text||'')}</div><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button></div></div>`;
       return;
     }
-    const chips=msgChips(m,true);
-    const showMeta=!!chips||!nx||nx.by==='ai'||ymd(nx.createdAt)!==d||nx.createdAt-m.createdAt>5*60000||!!nx.exportedAt!==!!m.exportedAt;
+    const tch=T?`<div class="tchips">${m.kind&&KIND[m.kind]?`<button class="k" data-act="tidyM" data-id="${m.id}">${KIND[m.kind].ic} ${KIND[m.kind].label}</button>`:`<button class="add" data-act="tidyM" data-id="${m.id}">＋ 種類</button>`}${m.st&&STL[m.st]?`<button class="s ${m.st}" data-act="tidyM" data-id="${m.id}">${STL[m.st]}</button>`:''}${(m.tags||[]).map(t=>`<button data-act="tidyM" data-id="${m.id}">#${esc(t)}</button>`).join('')}${m.pinned?'<button class="ex">📢</button>':''}${m.exportedAt?'<button class="ex">✓ 書き出し済</button>':''}</div>`:'';
+    const chips='';const tlab=lone&&!(i>0&&ymd(ms[i-1].createdAt)===d)?`${new Date(m.createdAt).getMonth()+1}/${new Date(m.createdAt).getDate()} ${hm(m.createdAt)}`:hm(m.createdAt);
+    const showMeta=lone||!nx||nx.by==='ai'||ymd(nx.createdAt)!==d||nx.createdAt-m.createdAt>5*60000||!!nx.exportedAt!==!!m.exportedAt;
     const n=m.images?.length||0;
     const imgs=n?`<div class="imgs ${n===1?'n1':n===2?'n2':n===3?'n3':n===4?'n4':'nmany'}">${m.images.map(b=>`<img data-blob="${b}" data-act="viewImg" alt="">`).join('')}</div>`:'';
     html+=`<div class="msg${S.sel&&S.sel.has(m.id)?' sel':''}" data-act="tapMsg" data-id="${m.id}" data-lpm="${m.id}">
       <div class="swact"><button data-act="msgAnn" data-id="${m.id}"><span>📢</span>${m.pinned?'外す':'アナウンス'}</button><button data-act="msgRoom" data-id="${m.id}"><span>💬</span>トークにする</button></div>
-      <div class="line"><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button><div class="bub${m.exportedAt?' done':''}${n&&!m.text?' onlyimg':''}${m.table?' tbl':''}">${m.kind&&KIND[m.kind]&&!m.table?`<span class="kbadge" title="${KIND[m.kind].label}">${KIND[m.kind].ic}</span>`:''}${imgs}${m.table?tableHTML(m):m.text?linkify(m.text):''}</div></div>
-      ${showMeta?`<div class="meta">${chips}${m.exportedAt?'<span class="done">✓ 書き出し済</span>':''}<span>${hm(m.createdAt)}</span></div>`:''}</div>`;
+      <div class="line"><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button><div class="bub${m.exportedAt?' done':''}${n&&!m.text?' onlyimg':''}${m.table?' tbl':''}">${imgs}${m.table?tableHTML(m):m.text?linkify(m.text):''}${tch}</div></div>
+      ${showMeta?`<div class="meta"><span>${tlab}</span></div>`:''}</div>`;
     if(m.aizuchi)html+=`<div class="reply"><div class="rbub">${esc(m.aizuchi)}</div></div>`;
   });
   html+=qBubbleHTML();
@@ -1033,11 +1064,18 @@ function promptSheet(title,value,placeholder,ok='OK'){return new Promise(res=>{
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229)done(inp.value.trim())});
   sh.querySelector('[data-x=no]').onclick=()=>done(null);sh.querySelector('[data-x=ok]').onclick=()=>done(inp.value.trim());
 })}
-function menuSheet(title,items){
-  const sh=openSheet(`${title?`<h3>${esc(title)}</h3>`:''}<div class="menu">${items.filter(Boolean).map((it,i)=>it.toggle
+const ACTI={edit:IC('<path d="M4 20h4L19 9l-4-4L4 16zM13 7l4 4"/>'),out:IC('<path d="M12 15V3M7 8l5-5 5 5M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6"/>'),move:IC('<path d="M4 12h14M13 7l5 5-5 5"/>'),trash:IC('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'),copy:IC('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/>')};
+function actRowHTML(acts){return `<div class="actrow">${acts.filter(Boolean).map((a,i)=>`<button data-ac="${i}" class="${a.danger?'danger':''}"><i>${ACTI[a.ic]||a.ic}</i>${esc(a.label)}</button>`).join('')}</div>`}
+function bindActs(sh,acts){const l=acts.filter(Boolean);sh.querySelectorAll('[data-ac]').forEach(b=>b.onclick=()=>{closeSheet();l[+b.dataset.ac].fn()})}
+function menuSheet(title,items,opt={}){
+  const all=items.filter(Boolean);const main=all.filter(it=>!it.more),more=all.filter(it=>it.more);
+  const row=(it)=>{const i=all.indexOf(it);return it.toggle
     ?`<div class="swrow" data-tg="${i}"><span class="ic">${it.icon||''}</span><div class="t">${esc(it.label)}${it.sub?`<small>${esc(it.sub)}</small>`:''}</div><div class="switch${it.on?' on':''}"></div></div>`
-    :`<button data-i="${i}" class="${it.danger?'danger':''}"><span class="ic">${it.icon||''}</span><span>${esc(it.label)}${it.sub?`<span class="sub">${esc(it.sub)}</span>`:''}</span></button>`).join('')}</div>`);
-  const list=items.filter(Boolean);
+    :`<button data-i="${i}" class="${it.danger?'danger':''}"><span class="ic">${it.icon||''}</span><span>${esc(it.label)}${it.sub?`<span class="sub">${esc(it.sub)}</span>`:''}</span></button>`};
+  const sh=openSheet(`${title?`<h3>${esc(title)}</h3>`:''}${opt.top||''}${opt.acts?actRowHTML(opt.acts):''}${main.length?`<div class="menu">${main.map(row).join('')}</div>`:''}${more.length?`<button class="moreb" data-more>その他<span>${esc(more.map(x=>x.short||x.label).slice(0,3).join('・'))}${more.length>3?'…':''}</span><b>›</b></button><div class="menu hidden" id="moreMenu">${more.map(row).join('')}</div>`:''}`);
+  if(opt.acts)bindActs(sh,opt.acts);
+  const mb=sh.querySelector('[data-more]');if(mb)mb.onclick=()=>{mb.classList.add('hidden');sh.querySelector('#moreMenu').classList.remove('hidden')};
+  const list=all;
   sh.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{closeSheet();list[+b.dataset.i].fn()});
   sh.querySelectorAll('[data-tg]').forEach(r=>r.onclick=()=>{const it=list[+r.dataset.tg];it.on=!it.on;r.querySelector('.switch').classList.toggle('on',it.on);it.fn(it.on)});
 }
@@ -1125,15 +1163,11 @@ function nodeMenu(id){
   menuSheet(n.name,[
     ib?null:{icon:n.fav?'☆':'⭐',label:n.fav?'お気に入りから外す':'お気に入り',sub:n.fav?'':'ホームの上（inboxの下）に並びます',fn:async()=>{n.fav=!n.fav;await saveNode(n);renderList()}},
     n.type==='room'?{toggle:true,icon:'💬',label:'相槌',sub:'メモを送ると、ひとこと返事します',on:!!n.aizuchi,fn:async on=>{n.aizuchi=on;await saveNode(n);if(!on){clearTimeout(aizT);aizT=null;setTyping(null)}toast(on?'相槌をオンにしました':'相槌をオフにしました')}}:null,
-    n.type==='room'&&S.roomId===n.id?{icon:'☑',label:'まとめて選択',sub:'メモを選んで分類・書き出し・移動',fn:()=>selStart()}:null,
-    {icon:'✎',label:'名前・アイコン・タグを編集',fn:()=>editNodeSheet(n)},
-    {icon:'↗',label:'書き出す・AIに頼む',sub:'分類・分解・データ化・資料化・ブレストなど',fn:()=>openExport({scope:[n.id]})},
-    !n.docs&&!ib?{icon:'🗄',label:n.archived?'アーカイブから戻す':'アーカイブする',sub:n.archived?'':(n.type==='folder'?'中のトークごと、アーカイブ帯にしまう':'アーカイブ帯にしまう。検索には出ます'),fn:()=>setArchived([n],!n.archived)}:null,
-    ib?null:{icon:'⇢',label:'移動する',fn:()=>moveSheet(n)},
-    n.type==='room'?{icon:n.badge?'○':'●',label:n.badge?'バッジを出さない':'未書き出しバッジを出す',fn:async()=>{n.badge=!n.badge;await saveNode(n);renderList()}}:null,
-    {icon:'↺',label:'書き出し済みの印をすべて外す',fn:async()=>{const set=new Set(n.type==='room'?[n.id]:descendants(n.id).filter(d=>d.type==='room').map(d=>d.id));const ch=[...S.msgs.values()].filter(m=>set.has(m.roomId)&&m.exportedAt);ch.forEach(m=>{m.exportedAt=null;m.exportId=null});await saveMsgs(ch);renderList();renderChat();toast(`${ch.length}件の印を外しました`)}},
-    ib?null:{icon:'🗑',label:'ごみ箱へ',sub:'90日間は元に戻せます',danger:true,fn:()=>deleteNodes([n])},
-  ]);
+    n.type==='room'&&S.roomId===n.id?{more:1,short:'選択',icon:'☑',label:'まとめて選択',sub:'メモを選んで分類・書き出し・移動',fn:()=>selStart()}:null,
+    !n.docs&&!ib?{more:1,short:'アーカイブ',icon:'🗄',label:n.archived?'アーカイブから戻す':'アーカイブする',sub:n.archived?'':(n.type==='folder'?'中のトークごと、アーカイブ帯にしまう':'アーカイブ帯にしまう。検索には出ます'),fn:()=>setArchived([n],!n.archived)}:null,
+    n.type==='room'?{more:1,short:'バッジ',icon:n.badge?'○':'●',label:n.badge?'バッジを出さない':'未書き出しバッジを出す',fn:async()=>{n.badge=!n.badge;await saveNode(n);renderList()}}:null,
+    {more:1,short:'済み印を外す',icon:'↺',label:'書き出し済みの印をすべて外す',fn:async()=>{const set=new Set(n.type==='room'?[n.id]:descendants(n.id).filter(d=>d.type==='room').map(d=>d.id));const ch=[...S.msgs.values()].filter(m=>set.has(m.roomId)&&m.exportedAt);ch.forEach(m=>{m.exportedAt=null;m.exportId=null});await saveMsgs(ch);renderList();renderChat();toast(`${ch.length}件の印を外しました`)}},
+  ],{acts:[{ic:'edit',label:'編集',fn:()=>editNodeSheet(n)},{ic:'out',label:'書き出す',fn:()=>openExport({scope:[n.id]})},ib?null:{ic:'move',label:'移動',fn:()=>moveSheet(n)},ib?null:{ic:'trash',label:'削除',danger:true,fn:()=>deleteNodes([n])}]});
 }
 async function deleteNodes(list){
   list=list.filter(n=>S.nodes.has(n.id)&&!isSys(n));if(!list.length)return;
@@ -1180,20 +1214,20 @@ function msgActions(m,o={}){
   const ai=m.by==='ai';const r=S.nodes.get(m.roomId);
   const items=o.sort?[{icon:'⏭',label:'スキップ',sub:'あとで決める',fn:()=>{S.ibSkip.add(m.id);ibSort()}},{icon:'■',label:'仕分けをやめる',fn:()=>{S.ibSkip=new Set()}}]:[
     o.view?{icon:'💬',label:'元のトークで開く',sub:r?r.name:'',fn:()=>openRoom(m.roomId,m.id)}:null,
-    {icon:'☑',label:'選択する',sub:o.view?'まとめて分類・完了・移動':'複数選んで書き出し・移動',fn:()=>o.view?(S.dv.sel=new Set([m.id]),S.dv.keepScroll=true,renderList()):selStart(m.id)},
-    ai?null:{icon:'📢',label:m.pinned?'アナウンスを外す':'アナウンスにする',sub:'トークの上に表示します',fn:()=>togglePin(m)},
-    ai||o.view?null:{icon:'💬',label:'トークにする',sub:'このメモを新しいトークに移します',fn:()=>msgToRoom(m)},
-    {icon:'⧉',label:'コピー',fn:()=>copyText(m.text||'')},
-    {icon:'✎',label:'編集',sub:'本文の一部だけ選んでコピーしたいときもここから',fn:()=>editMsg(m)},
-    {icon:'⇢',label:'別のトークへ移動',fn:()=>moveMsgsSheet([m])},
-    {icon:m.exportedAt?'○':'✓',label:m.exportedAt?'未書き出しに戻す':'書き出し済みにする',fn:async()=>{m.exportedAt=m.exportedAt?null:now();if(!m.exportedAt)m.exportId=null;await saveMsg(m);refreshMsgs()}},
-    {icon:'🗑',label:'ごみ箱へ',danger:true,fn:()=>trashMsgList([m])},
+    {more:1,short:'選択',icon:'☑',label:'選択する',sub:o.view?'まとめて分類・完了・移動':'複数選んで書き出し・移動',fn:()=>o.view?(S.dv.sel=new Set([m.id]),S.dv.keepScroll=true,renderList()):selStart(m.id)},
+    ai?null:{more:1,short:'アナウンス',icon:'📢',label:m.pinned?'アナウンスを外す':'アナウンスにする',sub:'トークの上に表示します',fn:()=>togglePin(m)},
+    ai||o.view?null:{more:1,short:'トーク化',icon:'💬',label:'トークにする',sub:'このメモを新しいトークに移します',fn:()=>msgToRoom(m)},
+    {more:1,short:'コピー',icon:'⧉',label:'コピー',fn:()=>copyText(m.text||'')},
+    {more:1,short:'済み印',icon:m.exportedAt?'○':'✓',label:m.exportedAt?'未書き出しに戻す':'書き出し済みにする',fn:async()=>{m.exportedAt=m.exportedAt?null:now();if(!m.exportedAt)m.exportId=null;await saveMsg(m);refreshMsgs()}},
   ].filter(Boolean);
+  const acts=o.sort?null:[{ic:'edit',label:'編集',fn:()=>editMsg(m)},ai?{ic:'copy',label:'コピー',fn:()=>copyText(m.text||'')}:{ic:'out',label:'書き出す',fn:()=>openExport({ids:[m.id]})},{ic:'move',label:'移動',fn:()=>moveMsgsSheet([m])},{ic:'trash',label:'削除',danger:true,fn:()=>trashMsgList([m])}];
   const chips=ai?'':`<div class="qcls"><div class="flabel">種類</div><div class="chips">${KINDS.map(k=>`<span class="chip ${m.kind===k.id?'in':''}" data-qk="${k.id}">${k.ic}${k.label}</span>`).join('')}</div>
     <div class="flabel">状態</div><div class="chips">${STS.map(x=>`<span class="chip ${m.st===x.id?'in':''}" data-qs="${x.id}">${x.id==='done'?'✓ ':''}${x.label}</span>`).join('')}</div></div>`;
   const sortHead=o.sort?`<div class="qsort"><div class="qsl">仕分け · 残り${o.left}件</div><div class="qst">${esc((m.text||'📷 画像').slice(0,200))}</div></div>`:'';
-  const sh=openSheet(`${sortHead}${o.view&&r?`<div class="qsrc">${esc(r.name)}</div>`:''}${chips}<div class="menu">${items.map((it,i)=>`<button data-i="${i}" class="${it.danger?'danger':''}"><span class="ic">${it.icon||''}</span><span>${esc(it.label)}${it.sub?`<span class="sub">${esc(it.sub)}</span>`:''}</span></button>`).join('')}</div>`);
-  sh.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{closeSheet();items[+b.dataset.i].fn()});
+  const main=items.filter(it=>!it.more),more=items.filter(it=>it.more);const row=it=>{const i=items.indexOf(it);return `<button data-i="${i}" class="${it.danger?'danger':''}"><span class="ic">${it.icon||''}</span><span>${esc(it.label)}${it.sub?`<span class="sub">${esc(it.sub)}</span>`:''}</span></button>`};
+  const sh=openSheet(`${sortHead}${o.view&&r?`<div class="qsrc">${esc(r.name)}</div>`:''}${!o.sort?`<div class="mprev">${esc((m.text||'📷 画像').slice(0,160))}</div>`:''}${acts?actRowHTML(acts):''}${chips}${main.length?`<div class="menu">${main.map(row).join('')}</div>`:''}${more.length?`<button class="moreb" data-more>その他<span>${esc(more.map(x=>x.short||x.label).join('・'))}</span><b>›</b></button><div class="menu hidden" id="moreMenu">${more.map(row).join('')}</div>`:''}`);
+  sh.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{closeSheet();items[+b.dataset.i].fn()});if(acts)bindActs(sh,acts);
+  {const mb=sh.querySelector('[data-more]');if(mb)mb.onclick=()=>{mb.classList.add('hidden');sh.querySelector('#moreMenu').classList.remove('hidden')}}
   const set=async(k,v)=>{const pk=m.kind??null,ps=m.st??null,pb=m.kindBy??null;m[k]=m[k]===v?null:v;m.kindBy='me';await saveMsg(m);closeSheet();
     const ibId=getInbox()?.id;const moved=k==='kind'&&m.kind?await ibAutoArchive([m]):[];refreshMsgs();
     if(o.sort&&k==='kind'){if(moved.length)ibMovedToast(moved,ibId);ibSort();return}
@@ -1424,8 +1458,8 @@ function exAI(h,list){
 function openExport({scope,ids,tab}={}){
   FIX=ids?[...ids]:null;
   if(!FIX){const keep=F;F=newF(scope||[]);F.status=keep.status||'new';PRESET=null}
-  let TAB=tab||LS.get('exTab','simple');
-  const sh=openSheet(`<div class="shead"><h3>書き出す</h3><div class="seg mini extab"><button data-e="tab" data-v="simple">シンプル</button><button data-e="tab" data-v="detail">詳細</button></div><button data-e="history">履歴</button></div>
+  let TAB=tab==='detail'?'detail':'simple';
+  const sh=openSheet(`<div class="shead"><button class="exback hidden" data-e="tab" data-v="simple">‹</button><h3 id="exH">書き出す</h3><button data-e="history">履歴</button></div>
   <div id="exSimple"></div>
   <div class="ex" id="exDetail">
     <div>
@@ -1486,13 +1520,18 @@ function openExport({scope,ids,tab}={}){
     const ai=H.how!=='raw';q('#exRawBtns').classList.toggle('hidden',ai);q('#exAiBtns').classList.toggle('hidden',!ai);q('#exMark').classList.toggle('hidden',ai);q('#exFmt').classList.toggle('hidden',ai);
     LS.set('exHow',H)};
   const drawSimple=()=>{const el=q('#exSimple');
-    const ts=[...TPL_DEF,...userTpls()];
-    el.innerHTML=`<div class="card"><div class="scope"><span class="nm">${FIX?`選んだメモ <b>${FIX.length}</b> 件`:`範囲：${esc(scopeLabel())}`}</span><button data-e="tab" data-v="detail">条件を変える</button></div></div>
-      <div class="tpls">${ts.map(t=>{const n=tplList(t).length;return `<button class="tpl" data-e="tpl" data-v="${esc(t.id)}" ${n?'':'disabled'}><span class="ic">${t.ic}</span><span class="t">${t.user?'★ ':''}${esc(t.name)}<small>${esc(howText(t.H))}${t.user&&t.full?'・条件つき':''}</small></span><span class="n">${n}</span></button>`}).join('')}</div>
-      <div class="hint" style="margin:10px 4px">数字は渡すメモの件数。自分用のテンプレートは「詳細」で作れます（長押しで削除）。</div>`};
-  const drawTab=()=>{sh.querySelectorAll('.extab button').forEach(b=>b.classList.toggle('on',b.dataset.v===TAB));
+    const T=id=>TPL_DEF.find(t=>t.id===id);const nC=tplList(T('t:consult')).length,nR=tplList(T('t:raw')).length;
+    const rest=[...TPL_DEF.filter(t=>t.id!=='t:raw'&&t.id!=='t:consult'),...userTpls()].map(t=>({t,n:tplList(t).length})).sort((a,b)=>(!a.n)-(!b.n));
+    el.innerHTML=`<div class="exscope"><span>${FIX?`選んだメモ <b>${FIX.length}</b>件`:`${esc(scopeLabel())}の <b>${nR}</b>件`}</span><button data-e="tab" data-v="detail">範囲・条件を変える</button></div>
+      <button class="exbig pri" data-e="tpl" data-v="t:consult" ${nC?'':'disabled'}><span class="e">💬</span><span class="t">AIと相談する<small>コピーしてAIに貼る → 会話で決める → 答えを貼って取り込む</small></span></button>
+      <button class="exbig" data-e="tpl" data-v="t:raw" ${nR?'':'disabled'}><span class="e">📋</span><span class="t">そのままコピー<small>自分で使う・人に渡す</small></span></button>
+      <button class="exbig" data-e="file" ${nR?'':'disabled'}><span class="e">💾</span><span class="t">ファイルに保存<small>.md・HTML・画像込みの .zip</small></span></button>
+      <div class="flabel" style="margin:16px 2px 8px">決まった頼み方（会話なしで、すぐJSON）</div>
+      <div class="exsm">${rest.map(({t,n})=>`<button data-e="tpl" data-v="${esc(t.id)}" ${n?'':'disabled'}>${t.ic} ${t.user?'★ ':''}${esc(t.name)}<i>${n}</i></button>`).join('')}</div>
+      <div class="hint" style="margin:10px 4px">★は自分のテンプレート（長押しで削除）。「範囲・条件を変える」の画面で保存できます。</div>`};
+  const drawTab=()=>{const bk=sh.querySelector('.exback');bk.classList.toggle('hidden',TAB!=='detail');q('#exH').textContent=TAB==='detail'?'範囲と条件':'書き出す';
     q('#exSimple').classList.toggle('hidden',TAB!=='simple');q('#exDetail').classList.toggle('hidden',TAB!=='detail');sh.querySelector('.exbar').classList.toggle('hidden',TAB!=='detail');
-    if(TAB==='simple')drawSimple();LS.set('exTab',TAB)};
+    if(TAB==='simple')drawSimple()};
   const drawAll=()=>{if(q('#exScope'))q('#exScope').textContent=scopeLabel();drawPresets();drawTags();drawStatus();drawInc();drawAdv();drawHow();q('#exMark').classList.toggle('on',!!O.mark);refresh();drawTab()};
   const refresh=()=>{
     LS.set('out',O);
@@ -1515,7 +1554,7 @@ function openExport({scope,ids,tab}={}){
     const el=e.target.closest('[data-e]');if(!el)return;const v=el.dataset.v;
     switch(el.dataset.e){
       case 'history':historySheet();break;
-      case 'tab':TAB=v;drawTab();break;
+      case 'tab':TAB=v;if(v==='detail'){refresh()}drawTab();break;
       case 'how':H.how=v;drawHow();refresh();break;
       case 'lv':H.lv=v;drawHow();break;
       case 'tlv':H.tlv=+v;drawHow();break;
@@ -1607,9 +1646,9 @@ function settings(){
       <button data-m="history"><span class="ic">🕘</span><span>書き出し履歴</span></button>
       <button data-m="import"><span class="ic">📥</span><span>AIの結果を取り込む<span class="sub">取り込みの履歴・取り消しもここから</span></span></button>
       <button data-m="trash"><span class="ic">🗑</span><span>ごみ箱<span class="sub">消したものは90日間ここから戻せます</span></span></button>
-      <button data-m="sample"><span class="ic">🧪</span><span>テスト用サンプルを入れる<span class="sub">新しい機能を一通り試せるフォルダを追加（今のメモには触りません）</span></span></button>
+      <button data-m="sample" class="${LS.get('dev',false)?'':'hidden'}"><span class="ic">🧪</span><span>テスト用サンプルを入れる<span class="sub">新しい機能を一通り試せるフォルダを追加（今のメモには触りません）</span></span></button>
     </div>`);
-  {let n=0,t=0;sh.querySelector('h3').onclick=()=>{const x=now();n=x-t<1500?n+1:1;t=x;if(n>=5){n=0;qStatsCopy()}}}
+  {let n=0,t=0;sh.querySelector('h3').onclick=()=>{const x=now();n=x-t<1500?n+1:1;t=x;if(n>=5){n=0;qStatsCopy();LS.set('dev',true);sh.querySelector('[data-m=sample]').classList.remove('hidden')}}}
   sh.querySelector('[data-m=sync]').onclick=()=>{closeSheet();syncSheet()};
   sh.querySelector('[data-m=backup]').onclick=()=>{closeSheet();backup()};
   sh.querySelector('[data-m=restore]').onclick=()=>{closeSheet();$('#fileBackup').click()};
@@ -2041,10 +2080,14 @@ function aiCopy(rec,text){
     hintOnce('aiPend','AIの答え（JSON）は、画面上の「🤖 結果待ち」から取り込めます')});
 }
 /* 結果待ちの札：ホームとトークの上に出す */
-function aiPendHTML(){const a=aiRecs();if(!a.length)return '';
-  const r=a[0];const more=a.length>1?` ほか${a.length-1}`:'';
-  return `<div class="aipend" data-act="aiPend"><span>🤖 ${esc(r.label)}の結果待ち（${esc(r.n||'')}）${more}</span><b>取り込む ›</b></div>`}
-function aiPendRefresh(){document.querySelectorAll('.aipendw').forEach(w=>w.innerHTML=aiPendHTML())}
+function aiPendHTML(){return ''}
+function aiPendRefresh(){let b=$('#pastebar');const a=aiRecs();
+  if(!a.length){if(b)b.remove();return}
+  if(!b){b=document.createElement('div');b.id='pastebar';document.body.appendChild(b);
+    b.addEventListener('click',async e=>{const r=aiRecs()[0];if(!r)return;
+      if(e.target.closest('[data-pb=paste]')){let t='';try{t=await navigator.clipboard.readText()}catch(err){}importSheet(r.id,t)}
+      else aiPendSheet()})}
+  const r=a[0];b.innerHTML=`<span class="t">🤖 ${esc(r.label)}の答えを待っています${a.length>1?`<small>ほか${a.length-1}件</small>`:''}</span><button data-pb="paste">貼って取り込む</button>`}
 function aiPendSheet(){const a=aiRecs();if(!a.length)return;
   const sh=openSheet(`<h3>🤖 AIの結果待ち</h3><p class="hint" style="margin:-6px 2px 12px">プロンプトをAIに貼って、返ってきたJSONを取り込みます。</p>
     <div class="aplist">${a.map(r=>`<div class="ap"><div class="t"><b>${esc(r.label)}</b>　${esc(r.n||'')}<small>${fmtTime(r.at)}にコピー${r.type==='consult'?` · 何回でも取り込めます${r.got?`（${r.got}回済み）`:''}`:''}${(r.type==='classify'||r.type==='split')&&r.total>CHUNK?` · ${r.done}/${r.total}件済み`:''}</small></div>
@@ -2343,7 +2386,7 @@ async function undoImport(id){
   renderList();renderRoom(true);LVrefresh&&LVrefresh();toast('取り込みを取り消しました'+(trashed?'（ごみ箱から戻せます）':''));
 }
 const FIX_MSG=e=>`さっきのJSONが読み込めませんでした${e?`（${e}）`:''}。同じ内容を、正しいJSONで、コードブロック1つだけで出し直してください。途中で切れそうなら、2回に分けて出してください。省略はしないでください。`;
-function importSheet(recId){
+function importSheet(recId,preText){
   const pend=aiRecs();const want=recId&&aiRec(recId);
   const sh=openSheet(`<div class="shead"><h3>AIの結果を取り込む</h3><button data-i="paste">クリップボードから</button></div>
     ${want?`<p class="hint" style="margin:-6px 2px 8px">「${esc(want.label)}（${esc(want.n||'')}）」の答えを貼ってください。</p>`:pend.length?`<p class="hint" style="margin:-6px 2px 8px">結果待ち：${pend.map(r=>esc(r.label)).join('・')}</p>`:''}
@@ -2389,6 +2432,7 @@ function importSheet(recId){
     }catch(e){console.error(e);toast('取り込めませんでした');btn.disabled=false}
   };
   drawLog();
+  if(preText){q('#impTx').value=preText;check()}
 }
 
 /* =========================================================
@@ -2766,12 +2810,12 @@ function dvTitle(v,gv){return gv==null||v.group==='none'?v.name:(S.dv.from==='ho
 function dvFilterHTML(v){
   const f=v.f,g=v.group;
   const chips=(arr,cur,key,multi)=>arr.map(([id,l])=>`<span class="chip ${multi?(cur.includes(id)?'in':''):(cur===id?'in':'')}" data-act="dv" data-d="${key}" data-v="${esc(id)}">${l}</span>`).join('');
-  const tags=allTags().slice(0,16);if(f.tag&&!tags.includes(f.tag))tags.unshift(f.tag);
+  const all=allTags();const tags=S.dv.allTags?all.slice(0,40):all.slice(0,6);if(f.tag&&!tags.includes(f.tag))tags.unshift(f.tag);const moreT=!S.dv.allTags&&all.length>6;
   return `<div class="dvf"><div class="searchbox dvq">${ICONS.search}<input id="dvq" placeholder="本文で探す" value="${esc(f.q||'')}"></div>
     <div class="chips">${chips(DV_RANGES,f.range||'','range',false)}</div>
     ${g==='kind'?'':`<div class="chips">${chips([...KINDS.map(k=>[k.id,k.ic+k.label]),['none','未分類']],f.kinds,'kind',true)}</div>`}
     <div class="chips">${chips([...STS.map(x=>[x.id,x.label]),['none','状態なし']],f.sts,'st',true)}<span class="chip ${f.arch?'in':''}" data-act="dv" data-d="arch">🗄 アーカイブも</span></div>
-    ${g==='tag'||!tags.length?'':`<div class="chips">${tags.map(t=>`<span class="chip ${f.tag===t?'in':''}" data-act="dv" data-d="tag" data-v="${esc(t)}">#${esc(t)}</span>`).join('')}</div>`}</div>`;
+    ${g==='tag'||!tags.length?'':`<div class="chips">${tags.map(t=>`<span class="chip ${f.tag===t?'in':''}" data-act="dv" data-d="tag" data-v="${esc(t)}">#${esc(t)}</span>`).join('')}${moreT?`<span class="chip add" data-act="dv" data-d="moreT">もっと（${all.length-6}）</span>`:''}</div>`}</div>`;
 }
 function dvBubHTML(m){
   const ai=m.by==='ai';const D=S.dv;const sel=D.sel&&D.sel.has(m.id);
@@ -2790,7 +2834,7 @@ function dvMarks(v,gv){
   o.amb=amb;return o;
 }
 function dvMarkText(v,gv){const o=dvMarks(v,gv);const a=[];if(o.kind)a.push(kindText(o.kind));if(o.st)a.push(STL[o.st]);o.tags.forEach(t=>a.push('#'+t));if(o.pinned)a.push('📢');
-  return a.length?'書くと '+a.join(' ')+' で保存':'書くと印なしで保存'}
+  return a.length?a.join(' ')+' として書く':'メモを書く（印なし）'}
 const dvCanWrite=v=>!(v.group==='digest'||v.f.docsOnly);
 async function dvSend(){
   const D=S.dv,v=D.v;const ta=$('#dvta');if(!v||!ta)return;const text=ta.value.replace(/\s+$/,'');if(!text.trim())return;
@@ -2824,7 +2868,7 @@ function renderData(P){
     body=`<div class="aipendw">${aiPendHTML()}</div>${fav.length?`<div class="dvh">⭐ お気に入り</div>${fav.map(v=>row(v)).join('')}`:''}
       <div class="dvh">種類別のトークルーム</div>${kg.map(krow).join('')||'<div class="dvempty">メモに種類が付くと、ここに並びます</div>'}
       <div class="dvh">ほかの見方</div>${DV_PRESETS.filter(v=>v.id!=='p:kind').map(v=>row(v,v.ic)).join('')}
-      <div class="dvh">マイビュー</div>${saved.filter(v=>!v.fav).map(v=>row(v)).join('')||'<div class="dvempty">ビューを開いて「💾」で保存すると、ここに並びます</div>'}`;
+      <div class="dvh">マイビュー</div>${saved.filter(v=>!v.fav).map(v=>row(v)).join('')||'<div class="dvempty">ビューを開いて右上の保存ボタンを押すと、ここに並びます</div>'}`;
   }else{
     const v=D.v,gv=D.gv;const inRoom=D.mode==='room';
     const saved=v.id&&!v.id.startsWith('p:');const changed=v.id===null;
@@ -2833,11 +2877,14 @@ function renderData(P){
       const hideDone=done.length&&!D.showDone&&!(v.f.sts.length===1&&v.f.sts[0]==='done');
       if(hideDone)ms=ms.filter(m=>m.st!=='done');
       const unc=dvIsUncls(v,gv)&&ms.some(m=>m.by!=='ai');
-      fixed=(D.showF?dvFilterHTML(v):'')
+      const fsum=()=>{const f=v.f;const p=[];const rg=DV_RANGES.find(x=>x[0]===(f.range||''));if(f.range)p.push(rg[1]);
+        (f.kinds||[]).forEach(k=>p.push(k==='none'?'未分類':KIND[k]?KIND[k].ic+KIND[k].label:k));(f.sts||[]).forEach(k=>p.push(k==='none'?'状態なし':STL[k]||k));if(f.tag)p.push('#'+f.tag);if(f.q)p.push('「'+f.q+'」');if(f.arch)p.push('🗄');
+        return p.length?`<div class="dvsum" data-act="dv" data-d="showF">${p.map(x=>`<span>${esc(x)}</span>`).join('')}<b>変更</b></div>`:''};
+      fixed=(D.showF?dvFilterHTML(v):fsum())
         +(unc&&!D.sel?`<div class="dvbar"><span>未分類 ${ms.filter(m=>m.by!=='ai').length}件</span><button data-act="dv" data-d="selstart">選んで分類</button><button data-act="dv" data-d="aicls">🤖 AIで分類</button></div>`:'');
       let day='',prev='';
       chat=(done.length&&!(v.f.sts.length===1&&v.f.sts[0]==='done')?`<div class="dvdone"><button data-act="dv" data-d="showDone">${D.showDone?`完了した${done.length}件を隠す`:`✓ 完了した${done.length}件を表示`}</button></div>`:'')
-        +(ms.map(m=>{const d=ymd(m.createdAt);let h='';if(d!==day){day=d;prev='';h=`<div class="daysep"><span>${dayLabel(m.createdAt)}</span></div>`}
+        +(ms.map(m=>{const d=ymd(m.createdAt);let h='';if(d!==day){day=d;h=`<div class="daysep"><span>${dayLabel(m.createdAt)}</span></div>`}
           const r=S.nodes.get(m.roomId);if(r&&r.id!==prev){prev=r.id;h+=`<div class="dvsrc${m.by==='ai'?' ai':''}" data-act="dv" data-d="jump" data-id="${m.id}">${r.ibArch?'🗃':r.docs?'📌':isArchived(r)?'🗄':'💬'} ${esc(r.name)} ›</div>`}
           return h+dvBubHTML(m)}).join('')||'<div class="roomempty"><div>条件に合うメモがありません'+(dvCanWrite(v)?'<br><span style="font-size:11.5px">下から書くと、このビューの印を付けて保存します</span>':'')+'</div></div>');
     }else{
@@ -2852,7 +2899,7 @@ function renderData(P){
     }else head=`<div class="top"><button class="icon" data-act="dv" data-d="back" title="戻る">${ICONS.back}</button>
       <div class="ttl"><div class="tx"><div class="nm">${esc(dvTitle(v,inRoom?gv:null))}</div><div class="sb">${inRoom?'抽出ルーム':'ビュー'}${changed?' · 条件を変更中':''}</div></div></div>
       ${inRoom?`<button class="dvfbtn${D.showF?' on':''}" data-act="dv" data-d="showF">絞込${dvFCount(v)?`<i>${dvFCount(v)}</i>`:''}</button>`:''}
-      <button class="icon dvfavb${v.fav?' on':''}" data-act="dv" data-d="${saved?'favcur':'save'}" title="${saved?'お気に入り':'ビューを保存'}">${saved?(v.fav?'★':'☆'):'💾'}</button>
+      <button class="icon dvfavb${v.fav?' on':''}" data-act="dv" data-d="${saved?'favcur':'save'}" title="${saved?'お気に入り':'ビューを保存'}">${saved?(v.fav?'★':'☆'):ICONS.bmk}</button>
       <button class="icon" data-act="dv" data-d="export" title="書き出す">${ICONS.out}</button>
       <button class="icon" data-act="dv" data-d="menu" title="メニュー">${ICONS.more}</button></div>`;
   }
@@ -2900,6 +2947,7 @@ function dvAct(el,e){
     case 'open':{D.from=null;const id=el.dataset.id;const sv=id.startsWith('p:')?DV_PRESETS.find(x=>x.id===id):dvSaved().find(x=>x.id===id);if(!sv)break;
       D.v=clone(sv);D.v.f=dvF(D.v.f);if(sv.gv!=null){D.gv=sv.gv;D.mode='room'}else{D.gv=null;D.mode='groups'}
       if(D.v.group==='none'){D.mode='room';D.gv=null}D.draft='';D.showF=false;D.sel=null;D.showDone=false;renderList();break}
+    case 'moreT':{D.allTags=true;D.keepScroll=true;renderList();break}
     case 'kroom':{D.v=clone(DV_PRESETS.find(x=>x.id==='p:kind'));D.v.f=dvF(D.v.f);D.gv=el.dataset.v;D.mode='room';D.from='home';D.draft='';D.showF=false;D.sel=null;D.showDone=false;renderList();break}
     case 'room':D.gv=el.dataset.v;D.mode='room';D.draft='';D.showF=false;D.sel=null;D.showDone=false;renderList();break;
     case 'back':if(D.from!=='home'&&D.mode==='room'&&D.v.group!=='none'&&!(D.v.gv!=null)){D.mode='groups';D.gv=null}else{D.mode='home';D.v=null;D.gv=null;D.from=null}D.sel=null;renderList();break;
@@ -2948,7 +2996,7 @@ function folderCounts(n){
   const ks=kids(n.id);let r=0,f=0,a=0,qt=0,qa=0;
   for(const k of ks){if(k.type==='folder'){f++;continue}if(k.archived){a++;continue}r++;
     if(k.qroom||k.mrun){qt++;if(roomMsgs(k.id).some(m=>m.by!=='ai'))qa++}}
-  return `<span class="fcnt">${r?`💬${r}`:''}${f?` 📁${f}`:''}${a?` 🗄${a}`:''}${qt?` <b>✅${qa}/${qt}</b>`:''}</span>`;
+  const p=[r+f?`${r+f}件`:''].filter(Boolean);return p.length||qt?`<span class="fcnt">${p.join('・')}${qt?` <b>問い ${qa}/${qt}</b>`:''}</span>`:'';
 }
 
 /* ---------- テスト用サンプル（新機能を一通り触れる） ---------- */
@@ -3053,7 +3101,7 @@ const ACT={
   toggleSearch:()=>{S.searchOpen=!S.searchOpen;if(!S.searchOpen)S.search='';renderList();$('#q')?.focus()},
   settings,backup,
   snoozeBackup:()=>{LS.set('backupSnooze',now()+3*86400000);fillListBody()},
-  newMenu:()=>menuSheet('',[{icon:'💬',label:'新しいトーク',fn:()=>newNode('room')},{icon:'📁',label:'新しいフォルダ',fn:()=>newNode('folder')},{icon:'📥',label:'AIの結果を取り込む',sub:'整理・ブレスト・資料化のJSONを貼る',fn:()=>importSheet()}]),
+  newMenu:()=>menuSheet('',[{icon:'💬',label:'新しいトーク',fn:()=>newNode('room')},{icon:'📁',label:'新しいフォルダ',fn:()=>newNode('folder')},{icon:'☑',label:'まとめて選択',sub:'トーク・フォルダを選んで書き出し・移動・まとめる',fn:()=>ACT.lselStart()}]),
   listView:()=>listView(),
   toggleArch:()=>{S.showArch=!S.showArch;fillListBody()},
   selClassify:()=>classifySheet(selList(),()=>selExit()),
@@ -3070,6 +3118,8 @@ const ACT={
   nodeMenu:(el,e)=>{e.stopPropagation();nodeMenu(el.dataset.id)},
   exportHere:()=>openExport({scope:S.cwd?[S.cwd]:[]}),
   exportRoom:()=>openExport({scope:[S.roomId]}),
+  tidy:()=>{S.tidy=!S.tidy;LS.set('tidy',S.tidy);renderRoom(true);toast(S.tidy?'整理モード：種類・状態・タグを表示します':'整理モードを終えました')},
+  tidyM:(el,e)=>{e&&e.stopPropagation();const m=S.msgs.get(el.dataset.id);if(m)msgActions(m)},
   closeRoom,
   pickImg:()=>$('#fileImg').click(),
   rmPending:el=>{S.pending.splice(+el.dataset.i,1);renderPending()},
@@ -3560,7 +3610,7 @@ async function syncSheet(){
   await purgeTrash(x=>x.deletedAt<now()-90*86400000);
   await normalizeOrders();
   await loadPhotos();
-  renderList();renderRoom();
+  renderList();renderRoom();aiPendRefresh();
   SYNC.start();
   if (!document.activeElement || !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) window.scrollTo(0,0);
 })();
