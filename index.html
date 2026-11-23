@@ -532,6 +532,8 @@ body:has(.backdrop) #toast{bottom:auto;top:calc(14px + env(safe-area-inset-top,0
 .ibri.pop{animation:flash 1.2s}
 .ibband{display:flex;align-items:center;gap:6px;margin:6px 12px 0;padding:7px 8px 7px 12px;border-radius:12px;background:#FFF4E2;color:#7A5A2E;font-size:13px}
 .ibband span{flex:1}.ibband b{font-weight:700}.ibband button{padding:5px 10px;border-radius:10px;background:rgba(255,255,255,.85);color:#7A5A2E;font-size:12px;font-weight:500}
+.sum3{background:var(--soft,#F4F1EC);border-radius:10px;padding:7px 10px;margin-bottom:8px;font-size:13px}
+.origc{display:block;margin-top:6px;padding:3px 9px;border-radius:9px;background:rgba(0,0,0,.05);color:var(--accent);font-size:12px}.origlist{max-height:55vh;overflow:auto}.origi{padding:8px 2px;border-bottom:1px solid var(--line,#eee);font-size:14px}.origi small{color:var(--sub);display:block;margin-bottom:2px}
 .aflist{max-height:46vh;overflow:auto}.afrow{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--line,#eee)}.afrow .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.afrow .chip{flex:none}
 .ibband{flex-wrap:wrap}.ibband span{min-width:90px}.ibarch{display:block;margin:2px 12px 0 auto;padding:4px 10px;border-radius:10px;background:#FFF4E2;color:#7A5A2E;font-size:12px}
 .ibband.ok{background:#EAF3E4;color:#4F7A55}
@@ -730,7 +732,7 @@ function idx(){
   const byRoom=new Map(),kids=new Map();
   S.msgs.forEach(m=>{let a=byRoom.get(m.roomId);if(!a)byRoom.set(m.roomId,a=[]);a.push(m)});
   byRoom.forEach(a=>a.sort((x,y)=>x.createdAt-y.createdAt));
-  S.nodes.forEach(n=>{const p=n.parentId||null;let a=kids.get(p);if(!a)kids.set(p,a=[]);a.push(n)});
+  S.nodes.forEach(n=>{if(n.origBox)return;const p=n.parentId||null;let a=kids.get(p);if(!a)kids.set(p,a=[]);a.push(n)});
   IDX={v:VER,byRoom,kids,lastAt:new Map(),badge:new Map(),rtags:new Map()};return IDX;
 }
 const kids=pid=>idx().kids.get(pid||null)||[];
@@ -885,7 +887,7 @@ function fillListBody(){
   if(S.searchOpen&&q){
     const nodeHits=[],msgHits=[];
     S.nodes.forEach(n=>{const tagHit=q.startsWith('#')&&(n.tags||[]).some(t=>t.toLowerCase().includes(q.slice(1)));if(n.name.toLowerCase().includes(q)||tagHit)nodeHits.push(n)});
-    for(const m of S.msgs.values()){if(msgHits.length>=60)break;if(m.by!=='ai'&&(m.text||'').toLowerCase().includes(q)&&S.nodes.has(m.roomId))msgHits.push(m)}
+    for(const m of S.msgs.values()){if(msgHits.length>=60)break;if(m.by!=='ai'&&!S.nodes.get(m.roomId)?.origBox&&(m.text||'').toLowerCase().includes(q)&&S.nodes.has(m.roomId))msgHits.push(m)}
     msgHits.sort((a,b)=>b.createdAt-a.createdAt);
     if(nodeHits.length)html+=`<div class="sectlabel">トーク・フォルダ</div><ul class="list" style="padding-bottom:4px">${sortNodes(nodeHits).map(n=>itemHTML(n,{path:true})).join('')}</ul>`;
     if(msgHits.length)html+=`<div class="sectlabel">メモ ${msgHits.length}${msgHits.length>=60?'+':''}件</div><ul class="list shits">${msgHits.map(m=>hitHTML(m,q)).join('')}</ul>`;
@@ -991,7 +993,7 @@ function updSend(){const b=$('#sendBtn');if(b)b.disabled=!($('#ta').value.trim()
 function allSelected(){const ms=roomMsgs(S.roomId);return ms.length&&ms.every(m=>S.sel.has(m.id))}
 
 function msgChips(m,noKind){
-  const p=[];if(m.pinned)p.push('<span>📢</span>');if(m.aiMade)p.push('<span title="AIがまとめた資料">🤖</span>');
+  const p=[];if(m.pinned)p.push('<span>📢</span>');if(m.aiMade)p.push('<span title="AIがまとめた資料">🤖</span>');if(m.src&&m.src.length)p.push(`<span class="origc" data-act="origView" data-id="${m.id}">📎元 ${m.src.length}</span>`);
   if(!noKind&&m.kind&&KIND[m.kind])p.push(`<span class="kc">${kindText(m.kind)}</span>`);
   if(m.st&&STL[m.st])p.push(`<span class="sc ${m.st}">${STL[m.st]}</span>`);
   if((m.tags||[]).length)p.push(`<span class="at">${m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`);
@@ -1022,7 +1024,7 @@ function renderChat(toBottom){
     const imgs=n?`<div class="imgs ${n===1?'n1':n===2?'n2':n===3?'n3':n===4?'n4':'nmany'}">${m.images.map(b=>`<img data-blob="${b}" data-act="viewImg" alt="">`).join('')}</div>`:'';
     html+=`<div class="msg${S.sel&&S.sel.has(m.id)?' sel':''}" data-act="tapMsg" data-id="${m.id}" data-lpm="${m.id}">
       <div class="swact"><button data-act="msgAnn" data-id="${m.id}"><span>📢</span>${m.pinned?'外す':'アナウンス'}</button><button data-act="msgRoom" data-id="${m.id}"><span>💬</span>トークにする</button></div>
-      <div class="line"><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button><div class="bub${m.exportedAt?' done':''}${n&&!m.text?' onlyimg':''}${m.table?' tbl':''}${isTask(m)?' task':''}${isTask(m)&&m.st==='done'?' tfin':''}">${ckHTML(m)}${imgs}${m.table?tableHTML(m):m.text?linkify(m.text):''}${tch}</div></div>
+      <div class="line"><button class="mbtn" data-act="msgMenu" data-id="${m.id}" title="メニュー">${ICONS.more}</button><div class="bub${m.exportedAt?' done':''}${n&&!m.text?' onlyimg':''}${m.table?' tbl':''}${isTask(m)?' task':''}${isTask(m)&&m.st==='done'?' tfin':''}">${ckHTML(m)}${imgs}${m.table?tableHTML(m):m.text?linkify(m.text):''}${m.src&&m.src.length?`<button class="origc" data-act="origView" data-id="${m.id}">📎 元のメモ ${m.src.length}件</button>`:''}${tch}</div></div>
       ${showMeta?`<div class="meta"><span>${tlab}</span></div>`:''}</div>`;
     if(m.aizuchi)html+=`<div class="reply"><div class="rbub">${esc(m.aizuchi)}</div></div>`;
   });
@@ -1250,6 +1252,7 @@ function msgActions(m,o={}){
   const ai=m.by==='ai';const r=S.nodes.get(m.roomId);
   const items=o.sort?[{icon:'⏭',label:'スキップ',sub:'あとで決める',fn:()=>{S.ibSkip.add(m.id);ibSort()}},{icon:'■',label:'仕分けをやめる',fn:()=>{S.ibSkip=new Set()}}]:[
     o.view?{icon:'💬',label:'元のトークで開く',sub:r?r.name:'',fn:()=>openRoom(m.roomId,m.id)}:null,
+    m.src&&m.src.length?{icon:'📎',label:`元のメモを見る（${m.src.length}件）`,fn:()=>origView(m.id)}:null,
     {more:1,short:'選択',icon:'☑',label:'選択する',sub:o.view?'まとめて分類・完了・移動':'複数選んで書き出し・移動',fn:()=>o.view?(S.dv.sel=new Set([m.id]),S.dv.keepScroll=true,renderList()):selStart(m.id)},
     ai?null:{more:1,short:'アナウンス',icon:'📢',label:m.pinned?'アナウンスを外す':'アナウンスにする',sub:'トークの上に表示します',fn:()=>togglePin(m)},
     ai||o.view?null:{more:1,short:'トーク化',icon:'💬',label:'トークにする',sub:'このメモを新しいトークに移します',fn:()=>msgToRoom(m)},
@@ -1348,7 +1351,7 @@ let F=newF([]),FIX=null,PRESET=null;
 
 function inScope(m){if(F.scope.includes(m.roomId))return true;if(S.nodes.get(m.roomId)?.archived)return false; // アーカイブは、そのトークを直接選んだときだけ
   if(!F.scope.length)return true;return ancestors(m.roomId).some(a=>F.scope.includes(a.id))}
-function scopeMsgs(){const out=[];for(const m of S.msgs.values()){if(!S.nodes.has(m.roomId))continue;if(m.by==='ai'&&!O.inc.ai)continue;if(inScope(m)){m._tags=msgTags(m);out.push(m)}}return out}
+function scopeMsgs(){const out=[];for(const m of S.msgs.values()){const r0=S.nodes.get(m.roomId);if(!r0||r0.origBox)continue;if(m.by==='ai'&&!O.inc.ai)continue;if(inScope(m)){m._tags=msgTags(m);out.push(m)}}return out}
 function collect(){
   if(FIX)return {list:FIX.map(id=>S.msgs.get(id)).filter(Boolean).sort((a,b)=>a.createdAt-b.createdAt)};
   let ex;try{ex=parseExpr(F.expr)}catch(e){return {err:e.message,list:[]}}
@@ -1831,7 +1834,7 @@ function lvCollect(F){
   const q=(F.q||'').trim().toLowerCase(),ks=new Set(F.kinds||[]),ss=new Set(F.sts||[]),tag=(F.tag||'').toLowerCase();const out=[];
   const since=RANGE_MS[F.range]?now()-RANGE_MS[F.range]:0;
   for(const m of S.msgs.values()){
-    const r=S.nodes.get(m.roomId);if(!r)continue;
+    const r=S.nodes.get(m.roomId);if(!r||r.origBox)continue;
     if(since&&m.createdAt<since)continue;
     if(F.docsOnly&&!r.docs)continue;
     if(!F.arch&&(r.archived||r.parentId)&&isArchived(r))continue;
@@ -2615,6 +2618,10 @@ function planMemos(j,rec){
   const nM=items.filter(x=>x.m).length,nQ=items.filter(x=>x.q).length;
   const nFo=(function c(a){return a.reduce((n,x)=>n+(x.k==='f'?1+c(x.ch):0),0)})(tree);
   const nNew=RL.filter(r=>!r.exist).length,nApp=RL.length-nNew;
+  const allM=items.filter(x=>x.m).map(x=>x.m);const srcSet=new Set();allM.forEach(m=>(m.src||[]).forEach(id=>srcSet.add(id)));
+  const sent=[...new Set(Object.entries((rec&&rec.refs)||{}).filter(([k])=>/^m\d+$/.test(k)).map(([,id])=>id))].filter(id=>{const m=S.msgs.get(id);return m&&m.by!=='ai'&&!S.nodes.get(m.roomId)?.origBox});
+  const nOrig=[...srcSet].filter(id=>{const m=S.msgs.get(id);return m&&m.by!=='ai'&&!S.nodes.get(m.roomId)?.origBox}).length,nStay=sent.filter(id=>!srcSet.has(id)).length;
+  const sum3=sent.length?`<div class="sum3">新しくできるメモ <b>${allM.length}</b>件 ／ 原本になる元のメモ <b>${nOrig}</b>件 ／ そのまま残るメモ <b>${nStay}</b>件</div>`:'';
   const crumb=n=>{const a=[];let x=n;while(x){a.unshift(x.name);x=x.parentId?S.nodes.get(x.parentId):null}return a.join(' › ')};
   const path=r=>r.exist?`<small style="color:var(--accent)">既存に追記 › ${esc(crumb(r.exist))}</small><br>`:(r.path.length?`<small style="color:var(--sub)">${r.path.map(esc).join(' › ')} › </small>`:'');
   const inNote=tree.filter(n=>n.inParent).length;
@@ -2622,7 +2629,7 @@ function planMemos(j,rec){
     wrap:newRoots.length?{on:!single,name:wname}:null,
     pick:items.map(x=>{const r=RL[x.ri];return x.q?{on:true,html:`${path(r)}<b>${r.exist?'':esc(r.title)}</b>　❓${r.mid&&!r.qs?`標準の問い（${esc(MCB.get(r.mid).n)}）`:'問い'}${qOf(r).length}件<br><small>${qOf(r).slice(0,3).map(esc).join(' / ')}${qOf(r).length>3?' …':''}</small>`}
       :{on:true,html:`${path(r)}<b>${r.exist?'':esc(r.title)}</b>　${x.m.kind?kindText(x.m.kind):'<span style="color:var(--sub)">未分類</span>'}${x.m.st?` <span class="sc ${x.m.st}">${stLabel(x.m,x.m.st)}</span>`:''}${x.m.tags.length?` <span class="at">${x.m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`:''}<br><small>${esc(flat(x.m.text).slice(0,60))}</small>`}}),
-    html:`${nNew?`「${esc(where)}」に、${nFo?`フォルダ <b>${nFo}</b>個と、`:''}トーク <b>${nNew}</b>個を作ります。`:''}${nApp?`<br>既存のトーク <b>${nApp}</b>個に追記します。`:''}${inNote?`<br>既存のフォルダの中に作るもの：${inNote}件`:''}（メモ${nM}件${nQ?`・問い${nQ}件`:''}）下でチェックしたものだけが入ります。${miss?`<br><span class="warn">見つからない番号：${miss}件（スキップ）</span>`:''}`,
+    html:sum3+`${nNew?`「${esc(where)}」に、${nFo?`フォルダ <b>${nFo}</b>個と、`:''}トーク <b>${nNew}</b>個を作ります。`:''}${nApp?`<br>既存のトーク <b>${nApp}</b>個に追記します。`:''}${inNote?`<br>既存のフォルダの中に作るもの：${inNote}件`:''}（メモ${nM}件${nQ?`・問い${nQ}件`:''}）下でチェックしたものだけが入ります。${miss?`<br><span class="warn">見つからない番号：${miss}件（スキップ）</span>`:''}`,
     apply:async(iid,picked,opt)=>{const t=now();const nodes=[],msgs=[],edit=[],prevRun={};
       const use=new Map();items.forEach((x,i)=>{if(picked&&!picked[i])return;const u=use.get(x.ri)||{m:[],q:false};x.m?u.m.push(x.m):u.q=true;use.set(x.ri,u)});
       if(!use.size)return {nodes:[],roots:[],msgs:[]};
@@ -2651,7 +2658,8 @@ function planMemos(j,rec){
       inRoots.forEach(n=>{roots=roots.concat(build([n],n.inParent,true))});
       build(apps,null,false);
       await saveNodes([...nodes,...edit]);if(msgs.length)await saveMsgs(msgs);if(rec&&rec.type!=='consult')aiDropRec(rec.id);
-      return {nodes:nodes.map(n=>n.id),roots,msgs:msgs.map(m=>m.id),prevRun:Object.keys(prevRun).length?prevRun:undefined,open:roots.length===1&&!edit.length?roots[0]:null}}};
+      const origBack=await origMove(msgs,iid);
+      return {origBack:origBack.length?origBack:undefined,nodes:nodes.map(n=>n.id),roots,msgs:msgs.map(m=>m.id),prevRun:Object.keys(prevRun).length?prevRun:undefined,open:roots.length===1&&!edit.length?roots[0]:null}}};
 }
 function makePlan(j,rec){
   switch(j.type){
@@ -2666,11 +2674,30 @@ function makePlan(j,rec){
   }
   throw new Error(`知らない種類のJSONです（type: ${j.type}）`);
 }
+/* ---- 原本：組み替えで使われた元メモ。一覧・検索・書き出し・AIには出さず、整理版の「📎元」からだけ見る ---- */
+const getOrigBox=()=>{let b=null;S.nodes.forEach(n=>{if(n.origBox&&(!b||n.createdAt<b.createdAt))b=n});return b};
+async function ensureOrigBox(){let b=getOrigBox();if(b)return b;
+  b={id:uid(),type:'room',parentId:null,name:'原本',emoji:'📎',color:PALETTE[6],tags:[],badge:false,origBox:true,archived:true,order:-2,createdAt:now(),lastAt:now()};
+  await saveNode(b);return b}
+/* 作ったメモの src を見て、元メモを原本へ移す。戻すための [id,元のroomId] を返す */
+async function origMove(made,iid){
+  const ids=new Set();made.forEach(m=>(m.src||[]).forEach(id=>ids.add(id)));if(!ids.size)return [];
+  const box=await ensureOrigBox();const ch=[],back=[];
+  ids.forEach(id=>{const m=S.msgs.get(id);if(!m||m.by==='ai'||m.roomId===box.id)return;
+    back.push([m.id,m.roomId]);m.orig={by:iid,room:m.roomId,at:now()};m.roomId=box.id;ch.push(m)});
+  if(ch.length)await saveMsgs(ch);return back}
+async function origRestore(back){const ch=[];(back||[]).forEach(([id,rid])=>{const m=S.msgs.get(id);if(!m)return;
+  m.roomId=S.nodes.has(rid)?rid:(getInbox()?.id||rid);delete m.orig;ch.push(m)});if(ch.length)await saveMsgs(ch)}
+function origView(id){const m=S.msgs.get(id);if(!m)return;const l=(m.src||[]).map(x=>S.msgs.get(x));
+  openSheet(`<h3>📎 元のメモ（${l.length}件）</h3><p class="hint" style="margin:-6px 2px 10px">このメモを作るときに使った元のメモです。原本として保管しています。</p>
+    <div class="origlist">${l.map(o=>o?`<div class="origi"><small>${mdhm(o.createdAt)}${o.orig&&S.nodes.get(o.orig.room)?`・${esc(S.nodes.get(o.orig.room).name)}`:''}</small><div>${esc(o.text||'📷 画像').replace(/\n/g,'<br>')}</div></div>`:`<div class="origi"><small>見つかりません（削除済み）</small></div>`).join('')}</div>
+    <div class="btns" style="margin-top:12px"><button class="btn" data-x="no">閉じる</button></div>`).querySelector('[data-x=no]').onclick=()=>closeSheet()}
 const importsLog=()=>LS.get('imports',[]);
 const saveImports=a=>LS.set('imports',a.slice(0,15));
 async function undoImport(id){
   const a=importsLog();const r=a.find(x=>x.id===id);if(!r||r.undone)return;const u=r.undo||{};
   if(u.prev){const ch=[];for(const [mid,[k,st,tags,kb]] of Object.entries(u.prev)){const m=S.msgs.get(mid);if(!m||m.importId!==r.id)continue;m.kind=k;m.st=st;m.tags=tags;m.kindBy=kb;delete m.importId;ch.push(m)}if(ch.length)await saveMsgs(ch)}
+  if(u.origBack&&u.origBack.length)await origRestore(u.origBack);
   if(u.ibMoved&&u.ibMoved.length)await ibUnarchive(u.ibMoved,u.ibId);
   if(u.restoreTid)await restoreTrash(u.restoreTid);
   if(u.moved&&u.moved.length){const ns=[];for(const x of u.moved){const n=S.nodes.get(x.id);if(n){n.parentId=x.parentId;n.order=x.order;ns.push(n)}}if(ns.length)await saveNodes(ns)}
@@ -3459,7 +3486,7 @@ const ACT={
   pickImg:()=>$('#fileImg').click(),
   rmPending:el=>{S.pending.splice(+el.dataset.i,1);renderPending()},
   send:sendMsg,
-  tab:el=>setTab(el.dataset.t),aiPend:()=>aiPendSheet(),ibSort:()=>{S.ibSkip=new Set();ibSort()},ibArchAll:()=>ibArchAll(),ibAI:()=>ibAI(),dv:(el,e)=>dvAct(el,e),openInbox:()=>openInbox(),ibSend:()=>ibSend(),ibNextQ:()=>ibNextQ(),ibQToggle:()=>ibQToggle(),
+  tab:el=>setTab(el.dataset.t),aiPend:()=>aiPendSheet(),ibSort:()=>{S.ibSkip=new Set();ibSort()},ibArchAll:()=>ibArchAll(),origView:(el,e)=>{e&&e.stopPropagation();origView(el.dataset.id)},ibAI:()=>ibAI(),dv:(el,e)=>dvAct(el,e),openInbox:()=>openInbox(),ibSend:()=>ibSend(),ibNextQ:()=>ibNextQ(),ibQToggle:()=>ibQToggle(),
   qSheet:()=>qSheet(),qNext:()=>qNext(),qEnd:()=>qEnd(),qAuto:()=>qAuto(),mEnough:()=>mEnough(),annJump:el=>annJump(el),
   msgAnn:el=>{mswClose();const m=S.msgs.get(el.dataset.id);if(m)togglePin(m)},msgRoom:el=>{mswClose();const m=S.msgs.get(el.dataset.id);if(m)msgToRoom(m)},
   loadMore:()=>{const c=$('#chat');const h=c.scrollHeight;S.win+=200;renderChat(false);c.scrollTop=c.scrollHeight-h},
