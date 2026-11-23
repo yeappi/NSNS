@@ -1506,7 +1506,7 @@ function openExport({scope,ids,tab}={}){
     ${inFrame&&!DL?'<div class="note">この表示ではファイル保存がブロックされることがあります。HTMLファイルを直接開けば保存できます。</div>':''}
     <div class="markrow" id="exMark" data-e="mark"><span class="ck">✓</span>書き出したら「済み」の印をつける（履歴から取り消せます）</div>
     <div class="row" id="exRawBtns"><button class="btn pri" data-e="copy">コピー<span class="cnt" id="exCnt1"></span></button><button class="btn" data-e="file">保存<span class="cnt" id="exCnt2"></span></button></div>
-    <div class="row hidden" id="exAiBtns"><button class="btn pri" data-e="ai">🤖 プロンプトをコピー<span class="cnt" id="exCnt3"></span></button><button class="btn hidden" id="exPlainB" data-e="plain">プロンプトだけ<small style="display:block;font-size:10.5px;color:var(--sub)">取り込みなし</small></button></div>
+    <div class="row hidden" id="exAiBtns"><button class="btn pri" data-e="ai">🤖 プロンプトをコピー<span class="cnt" id="exCnt3"></span></button></div>
   </div>`,{full:true});
 
   let cur={list:[]};
@@ -1530,7 +1530,6 @@ function openExport({scope,ids,tab}={}){
   const drawHow=()=>{const chip=([k,l,ic])=>`<span class="chip ${H.how===k?'in':''}" data-e="how" data-v="${k}">${ic} ${l}</span>`;
     q('#exHow').innerHTML=HOWS.slice(0,2).map(chip).join('')+`<div class="flabel" style="width:100%;margin:8px 0 0">決まった頼み方</div>`+HOWS.slice(2).map(chip).join('');
     q('#exHowD').textContent=HOWB[H.how][3]+(H.how==='raw'?'':H.how==='consult'?'。確定したらAIがJSONを返すので、何回でも取り込めます':'。プロンプトをコピーして自分のAIに貼り、返ってきたJSONを取り込みます');
-    q('#exPlainB').classList.toggle('hidden',H.how!=='consult');
     const lvOn=HOW_LV.has(H.how)||H.how==='think';q('#exLvW').classList.toggle('hidden',!lvOn);
     q('#exLv').innerHTML=H.how==='think'?THINK_LV.map(([n,d])=>`<button class="${(H.tlv||2)===n?'on':''}" data-e="tlv" data-v="${n}" title="${esc(d)}">${n}</button>`).join('')
       :Object.entries(LV_NAME).map(([k,l])=>`<button class="${(H.lv||'keep')===k?'on':''}" data-e="lv" data-v="${k}">${l}</button>`).join('');
@@ -1543,6 +1542,7 @@ function openExport({scope,ids,tab}={}){
       <button class="exbig pri" data-e="tpl" data-v="t:consult" ${nC?'':'disabled'}><span class="e">💬</span><span class="t">AIと相談する<small>コピーしてAIに貼る → 会話で決める → 答えを貼って取り込む</small></span></button>
       <button class="exbig" data-e="tpl" data-v="t:raw" ${nR?'':'disabled'}><span class="e">📋</span><span class="t">そのままコピー<small>自分で使う・人に渡す</small></span></button>
       <button class="exbig" data-e="file" ${nR?'':'disabled'}><span class="e">💾</span><span class="t">ファイルに保存<small>.md・HTML・画像込みの .zip</small></span></button>
+      <button class="exbig" data-e="rules"><span class="e">🧾</span><span class="t">ルールだけコピー<small>メモは付けない。AIとの会話の続きに貼って、NSNS用に整えてもらう</small></span></button>
       <div class="flabel" style="margin:16px 2px 8px">決まった頼み方（会話なしで、すぐJSON）</div>
       <div class="exsm">${rest.map(({t,n})=>`<button data-e="tpl" data-v="${esc(t.id)}" ${n?'':'disabled'}>${t.ic} ${t.user?'★ ':''}${esc(t.name)}<i>${n}</i></button>`).join('')}</div>
       <div class="hint" style="margin:10px 4px">★は自分のテンプレート（長押しで削除）。「範囲・条件を変える」の画面で保存できます。</div>`};
@@ -1560,7 +1560,7 @@ function openExport({scope,ids,tab}={}){
     q('#exPrev').textContent=txt.length>8000?txt.slice(0,8000)+'\n…':txt;
     const aiN=cur.list.filter(m=>m.by!=='ai').length;
     q('#exCnt1').textContent=q('#exCnt2').textContent=cur.list.length?`（${cur.list.length}件）`:'';q('#exCnt3').textContent=aiN?`（${aiN}件）`:'';
-    sh.querySelectorAll('[data-e=copy],[data-e=file]').forEach(b=>b.disabled=!cur.list.length);q('[data-e=ai]').disabled=!aiN;q('#exPlainB').disabled=!aiN;
+    sh.querySelectorAll('[data-e=copy],[data-e=file]').forEach(b=>b.disabled=!cur.list.length);q('[data-e=ai]').disabled=!aiN;
     q('#exImgNote').classList.toggle('hidden',!imgN);
     const pe=q('#exPresets');if(pe)drawPresets();
   };
@@ -1576,7 +1576,7 @@ function openExport({scope,ids,tab}={}){
       case 'lv':H.lv=v;drawHow();break;
       case 'tlv':H.tlv=+v;drawHow();break;
       case 'ai':{const l=cur.list.filter(m=>m.by!=='ai');if(!l.length)break;closeSheet(sh.parentElement);exAI(H,l);break}
-      case 'plain':{const l=cur.list.filter(m=>m.by!=='ai').sort((a,b)=>a.createdAt-b.createdAt);if(!l.length)break;if(await copyText(consultPlain(l),true))toast('プロンプトをコピーしました。AIに貼って相談してください');break}
+      case 'rules':copyRules();break;
       case 'tpl':{const t=[...TPL_DEF,...userTpls()].find(x=>x.id===v);if(!t)break;const l=tplList(t);if(!l.length)break;
         if(t.H.how==='raw'){const o=t.O?{inc:Object.assign({},O.inc,t.O.inc),mode:t.O.mode||O.mode}:O;
           if(await copyText(blocksToText(buildBlocks(l,o),'ph'),true)){if(!O.mark)toast('コピーしました');await recordExport(l,'コピー');closeSheet(sh.parentElement)}}
@@ -2047,12 +2047,33 @@ ${P_FLOW}
 ${msgs?rooms.map(r=>{const ms=msgs.filter(m=>m.roomId===r.id);return `## トーク「${r.name}」 id:${X.rr(r)}（選んだ${ms.length}件）\n`+ms.map(m=>'私: '+flat(m.text)).join('\n')}).join('\n\n'):rooms.map(r=>roomForAI(r,X)).join('\n\n')}
 `,
 };
-const consultPlain=msgs=>`以下は、メモアプリに書きためた私のメモです（( ) は書いた日付）。これをどうするかは会話しながら決めたいので、まず「このメモで何をしたいか」を短く聞いてください。迷っていそうなら、整理のしかたをいくつか提案してください。メモにない事実は足さないでください。
+const RULES_PROMPT=()=>`あなたは、メモアプリ「NSNS」に入れる形にメモを整えるアシスタントです。ここまでの私との会話（この下に続く内容）を、私と相談しながらNSNS用のメモにします。メモアプリ側には、まだ何も渡していません。
 
-# メモ（${msgs.length}件）
-${consultMemos(msgs,null)}
+# 進め方
+1. まず「この会話をどうしたいか」を短く1つだけ聞いてください。私が迷っていそうなら、下の「メモの作り方」から2〜3個、理由を添えて提案してください。
+2. 案は、人が読みやすい形で見せてください。JSONはまだ出さないでください。直してほしいところを伝えるので、何度でも出し直してください。
+3. 私が「確定」と言ったら、下の「出力形式」のJSONを1つだけ、コードブロックで出してください。前に件数を書いた1行は付けて構いません。
+4. 省略せず、全件を出してください。「以下同様」などで省かないでください。
+
+# ルール
+- 会話にない事実を足さないでください。推測で埋めないでください。
+- メモ1件は、1つの話題だけにしてください。長い話は分けてください。
+- 本文は、私の言葉づかいをなるべく残してください。AIの返答や前置きはメモに入れず、私が決めたこと・考えたこと・やることだけを残してください。
+
+# メモの作り方（相談の選択肢）
+- 話題ごとにトークを分けて、それぞれにメモを入れる
+- やることだけを抜き出してタスクにする
+- 決まったことと、まだ決まっていないこと（問い）に分ける
+- 全部を1つのトークに、時系列で並べる
+
+# 出力形式
+{"nsns":1,"type":"memos","rooms":[{"title":"トーク名（20字以内）","memos":[{"text":"メモの本文","kind":"task","st":"draft","tags":["タグ"]}]}]}
+- kind（1件に1つ）: ${KINDS.map(k=>`${k.id}＝${k.label}`).join(' ／ ')} ／ null＝どれとも言えない
+- st: draft＝未確定・未着手 ／ fixed＝決めたこと ／ done＝終わったこと ／ null＝状態を持たない。task は draft か done だけです。
+- tags は0〜3個です。迷うときは付けないでください。
+- rooms は1〜8個です。トークごとに、読み返して意味が通るようにまとめてください。
 `;
-const AI_LABEL={consult:'AIと相談',classify:'分類',brainstorm:'ブレスト',next:'次の問い',questions:'次の問い',digest:'資料化',think:'AI思考法',split:'分解',data:'データ化'};
+const AI_LABEL={consult:'AIと相談',classify:'分類',brainstorm:'ブレスト',next:'次の問い',questions:'次の問い',digest:'資料化',think:'AI思考法',split:'分解',data:'データ化',memos:'メモ作成'};
 /* 原文をどこまで変えてよいか（分解・データ化・資料化） */
 const LV_TXT={
   keep:'原文を残す：言い換えない。誤字もそのまま。切り分けや並べ替えだけをする。',
@@ -2089,6 +2110,7 @@ function aiSendNext(rec){
   rec.n=`メモ${take.length}件${part}`;
   aiCopy(rec,PROMPTS[rec.type]({msgs:take,lv:rec.lv},aiX(rec)));
 }
+function copyRules(){const rec={id:rid4(),type:'memos',at:now(),refs:{},label:AI_LABEL.memos,n:'ルールだけ'};aiCopy(rec,RULES_PROMPT())}
 function aiCopy(rec,text){
   if(rec.type!=='classify'&&rec.type!=='split'&&text.length<300000)rec.text=text;
   aiPutRec(rec);
@@ -2369,6 +2391,29 @@ function planData(j,rec){
       docs.lastAt=t;await saveNode(docs);await saveMsg(m);if(rec)aiDropRec(rec.id);
       return {nodes,roots:nodes,msgs:[m.id],open:docs.id}}};
 }
+function planMemos(j,rec){
+  const mapT=tagMapper();
+  const rooms=(Array.isArray(j.rooms)?j.rooms:[]).map(r=>({title:String(r?.title||r?.name||'').trim().slice(0,60),
+    memos:(Array.isArray(r?.memos)?r.memos:[]).map(x=>typeof x==='string'?{text:x}:x).filter(x=>x&&String(x.text||'').trim()).map(x=>{
+      let kind=isNull(x.kind)?null:String(x.kind).trim();if(kind&&!KIND[kind]){const w=kindWord(kind.toLowerCase());kind=w===undefined?null:w}
+      let st=isNull(x.st)?null:String(x.st).trim();if(st&&!STL[st])st={'未確定':'draft','確定':'fixed','完了':'done'}[st]||null;
+      if(kind==='task'&&st==='fixed')st='draft';
+      return {text:String(x.text).trim(),kind,st,tags:[...new Set((Array.isArray(x.tags)?x.tags:[]).map(mapT).filter(Boolean))].slice(0,5)}})})).filter(r=>r.memos.length);
+  if(!rooms.length)throw new Error('メモがありません（rooms[].memos が空です）');
+  rooms.forEach((r,i)=>{if(!r.title)r.title='AIと整理 '+(i+1)});
+  let pid=S.cwd&&S.nodes.has(S.cwd)?S.cwd:null;const where=pid?S.nodes.get(pid).name:'ホーム';
+  const flatL=[];rooms.forEach((r,ri)=>r.memos.forEach(m=>flatL.push({ri,m})));
+  return {count:flatL.length,
+    pick:flatL.map(({ri,m})=>({on:true,html:`${m.kind?kindText(m.kind):'<span style="color:var(--sub)">未分類</span>'}${m.st?` <span class="sc ${m.st}">${stLabel(m,m.st)}</span>`:''}${m.tags.length?` <span class="at">${m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`:''}<br><small>${esc(flat(m.text).slice(0,60))}</small>`})),
+    html:`「${esc(where)}」に、トーク ${rooms.map(r=>`「<b>${esc(r.title)}</b>」`).join('')} を作ってメモを入れます（チェックしたものだけ）。`,
+    apply:async(iid,picked)=>{const t=now();const nodes=[],msgs=[];let k=0;
+      for(let ri=0;ri<rooms.length;ri++){const use=flatL.map((x,i)=>({...x,i})).filter(x=>x.ri===ri&&(!picked||picked[x.i]));if(!use.length)continue;
+        const ro={id:uid(),type:'room',parentId:pid,name:rooms[ri].title,emoji:'',color:PALETTE[ri%7],tags:[],badge:true,order:nextTopOrder(pid)+(k++),createdAt:t,lastAt:t,importId:iid};nodes.push(ro);
+        use.forEach((x,n)=>{const m={id:uid(),roomId:ro.id,text:x.m.text,images:[],createdAt:t+n,exportedAt:null,exportId:null,importId:iid,tags:x.m.tags};
+          if(x.m.kind){m.kind=x.m.kind;m.kindBy='ai'}if(x.m.st){m.st=x.m.st}msgs.push(m)})}
+      await saveNodes(nodes);await saveMsgs(msgs);if(rec)aiDropRec(rec.id);
+      return {nodes:nodes.map(n=>n.id),roots:nodes.map(n=>n.id),msgs:msgs.map(m=>m.id),open:nodes.length===1?nodes[0].id:null}}};
+}
 function makePlan(j,rec){
   switch(j.type){
     case 'classify':return planClassify(j,rec);
@@ -2378,6 +2423,7 @@ function makePlan(j,rec){
     case 'think':return planThink(j,rec);
     case 'split':return planSplit(j,rec);
     case 'data':return planData(j,rec);
+    case 'memos':return planMemos(j,rec);
   }
   throw new Error(`知らない種類のJSONです（type: ${j.type}）`);
 }
@@ -3133,7 +3179,7 @@ const ACT={
   toggleSearch:()=>{S.searchOpen=!S.searchOpen;if(!S.searchOpen)S.search='';renderList();$('#q')?.focus()},
   settings,backup,
   snoozeBackup:()=>{LS.set('backupSnooze',now()+3*86400000);fillListBody()},
-  newMenu:()=>menuSheet('',[{icon:'💬',label:'新しいトーク',fn:()=>newNode('room')},{icon:'📁',label:'新しいフォルダ',fn:()=>newNode('folder')},{icon:'☑',label:'まとめて選択',sub:'トーク・フォルダを選んで書き出し・移動・まとめる',fn:()=>ACT.lselStart()}]),
+  newMenu:()=>menuSheet('',[{icon:'💬',label:'新しいトーク',fn:()=>newNode('room')},{icon:'📁',label:'新しいフォルダ',fn:()=>newNode('folder')},{icon:'☑',label:'まとめて選択',sub:'トーク・フォルダを選んで書き出し・移動・まとめる',fn:()=>ACT.lselStart()},{icon:'🧾',label:'AIの会話をメモにする',sub:'ルールだけコピー → AIに貼って整えてもらう → 答えを取り込む',fn:()=>copyRules()}]),
   listView:()=>listView(),
   toggleArch:()=>{S.showArch=!S.showArch;fillListBody()},
   selClassify:()=>classifySheet(selList(),()=>selExit()),
