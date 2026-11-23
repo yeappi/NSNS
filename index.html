@@ -532,6 +532,7 @@ body:has(.backdrop) #toast{bottom:auto;top:calc(14px + env(safe-area-inset-top,0
 .ibri.pop{animation:flash 1.2s}
 .ibband{display:flex;align-items:center;gap:6px;margin:6px 12px 0;padding:7px 8px 7px 12px;border-radius:12px;background:#FFF4E2;color:#7A5A2E;font-size:13px}
 .ibband span{flex:1}.ibband b{font-weight:700}.ibband button{padding:5px 10px;border-radius:10px;background:rgba(255,255,255,.85);color:#7A5A2E;font-size:12px;font-weight:500}
+.ibband{flex-wrap:wrap}.ibband span{min-width:90px}.ibarch{display:block;margin:2px 12px 0 auto;padding:4px 10px;border-radius:10px;background:#FFF4E2;color:#7A5A2E;font-size:12px}
 .ibband.ok{background:#EAF3E4;color:#4F7A55}
 .qsort{background:#FFF4E2;border-radius:14px;padding:10px 12px;margin:0 0 6px}.qsl{font-size:11px;color:#9A7A4E;margin-bottom:3px}.qst{white-space:pre-wrap;font-size:14.5px;line-height:1.6;color:#4A3A22}
 .mth{font-weight:600;color:var(--accent-ink)}
@@ -2866,7 +2867,7 @@ function annHTML(r){
 }
 const ibUnsorted=()=>{const b=getInbox();return b?roomMsgs(b.id).filter(m=>m.by!=='ai'&&!m.kind):[]};
 function ibBandHTML(){const n=ibUnsorted().length;
-  return n?`<div class="ibband"><span>未整理 <b>${n}</b>件</span><button data-act="ibSort">1件ずつ仕分ける</button><button data-act="ibAI">🤖 AI</button></div>`
+  return n?`<div class="ibband"><span>未整理 <b>${n}</b>件</span><button data-act="ibSort">1件ずつ仕分ける</button><button data-act="ibAI">🤖 AI</button><button data-act="ibArchAll">すべてアーカイブへ</button></div>`
     :`<div class="ibband ok"><span>✨ inboxは空です。仕分けたメモはアーカイブinboxへ</span></div>`}
 /* 仕分け：未整理の古い順に1件ずつ、種類を選ぶと次へ */
 S.ibSkip=new Set();
@@ -2936,6 +2937,17 @@ async function ibUnarchive(ids,ibId){
   const ms=(ids||[]).map(id=>S.msgs.get(id)).filter(Boolean);ms.forEach(m=>m.roomId=ib.id);
   if(ms.length)await saveMsgs(ms);refreshMsgs();
 }
+/* 種類を付けずに、inboxのメモを（指定が無ければ全部）アーカイブinboxへ移す。直前の💡問いも一緒 */
+async function ibArchiveMsgs(list){
+  const ib=getInbox();if(!ib)return [];
+  const mv=(list||roomMsgs(ib.id)).filter(m=>m&&m.roomId===ib.id&&m.by!=='ai');if(!mv.length)return [];
+  const qs=roomMsgs(ib.id).filter(x=>x.by==='ai');const all=[...mv];
+  for(const m of mv){const q=qs.find(x=>{const d=m.createdAt-x.createdAt;return d>0&&d<=5000});if(q&&!all.includes(q))all.push(q)}
+  const a=await ensureIbArch();all.forEach(m=>m.roomId=a.id);
+  a.lastAt=Math.max(a.lastAt||0,...mv.map(m=>m.createdAt));await saveMsgs(all);await saveNode(a);return all.map(m=>m.id)}
+async function ibArchAll(){const ib=getInbox();if(!ib)return;
+  const ids=await ibArchiveMsgs();if(!ids.length){toast('inboxは空です');return}
+  refreshMsgs();if(S.tab==='inbox')renderList();ibMovedToast(ids,ib.id)}
 function ibMovedToast(ids,ibId){if(!ids.length)return;const n=ids.filter(id=>S.msgs.get(id)?.by!=='ai').length;
   toast(`${n}件をアーカイブinboxへ移しました`,'元に戻す',()=>ibUnarchive(ids,ibId))}
 function navHTML(){
@@ -2953,6 +2965,7 @@ function ibQHTML(){if(!LS.get('ibq',true))return `<button class="ibqoff" data-ac
   return q?`<div class="ibq"><div class="t">💡 ${esc(q.t)}</div><div class="b"><button data-act="ibNextQ">次の問い</button><button data-act="ibQToggle">問いを出さない</button></div></div>`:''}
 function ibRecHTML(){const b=getInbox();if(!b)return '';const ms=roomMsgs(b.id).filter(m=>m.by!=='ai');const n=ibUnsorted().length;
   return `<div class="ibrh" data-act="openInbox"><span>inbox ${ms.length}件${n?` · 未整理 <b>${n}</b>`:''}</span><span class="go">${n?'仕分ける':'開く'} ›</span></div>`
+    +(ms.length?`<button class="ibarch" data-act="ibArchAll">すべてアーカイブへ</button>`:'')
     +ms.slice(-3).reverse().map((m,i)=>`<div class="ibri${i===0&&S.ibPop?' pop':''}" data-act="openInbox"><span class="t">${esc(flat(m.text||'📷 画像').slice(0,60))}</span><span class="tm">${fmtTime(m.createdAt)}</span></div>`).join('')}
 function renderInbox(P){
   P.innerHTML=`<div class="top"><div class="brand">inbox <small>思いついたら、ここに</small></div>
@@ -3342,7 +3355,8 @@ const ACT={
     menuSheet(`${l.length}件のメモをAIへ`,[
       {icon:'🤖',label:'AIに頼む',sub:'分類・ブレスト・問い・資料化',fn:()=>{aiAskMsgs(l,`選んだメモ${l.length}件`);selExit()}},
     ])},
-  selMore:()=>{const l=selList();const anyNew=l.some(m=>!m.exportedAt);menuSheet('',[
+  selMore:()=>{const l=selList();const anyNew=l.some(m=>!m.exportedAt);const inIb=isInbox(S.nodes.get(S.roomId));menuSheet('',[
+    inIb&&l.some(m=>m.by!=='ai')?{icon:'🗃',label:'アーカイブinboxへ',fn:async()=>{const ib=getInbox();const ids=await ibArchiveMsgs(l);selExit();refreshMsgs();if(ids.length)ibMovedToast(ids,ib.id)}}:null,
     l.length===1?{icon:'✎',label:'編集',fn:()=>ACT.selEdit()}:null,
     {icon:'⧉',label:'コピー',fn:()=>ACT.selCopy()},
     {icon:anyNew?'✓':'○',label:anyNew?'書き出し済みにする':'未書き出しに戻す',fn:()=>ACT.selMark()},
@@ -3361,7 +3375,7 @@ const ACT={
   pickImg:()=>$('#fileImg').click(),
   rmPending:el=>{S.pending.splice(+el.dataset.i,1);renderPending()},
   send:sendMsg,
-  tab:el=>setTab(el.dataset.t),aiPend:()=>aiPendSheet(),ibSort:()=>{S.ibSkip=new Set();ibSort()},ibAI:()=>ibAI(),dv:(el,e)=>dvAct(el,e),openInbox:()=>openInbox(),ibSend:()=>ibSend(),ibNextQ:()=>ibNextQ(),ibQToggle:()=>ibQToggle(),
+  tab:el=>setTab(el.dataset.t),aiPend:()=>aiPendSheet(),ibSort:()=>{S.ibSkip=new Set();ibSort()},ibArchAll:()=>ibArchAll(),ibAI:()=>ibAI(),dv:(el,e)=>dvAct(el,e),openInbox:()=>openInbox(),ibSend:()=>ibSend(),ibNextQ:()=>ibNextQ(),ibQToggle:()=>ibQToggle(),
   qSheet:()=>qSheet(),qNext:()=>qNext(),qEnd:()=>qEnd(),qAuto:()=>qAuto(),mEnough:()=>mEnough(),annJump:el=>annJump(el),
   msgAnn:el=>{mswClose();const m=S.msgs.get(el.dataset.id);if(m)togglePin(m)},msgRoom:el=>{mswClose();const m=S.msgs.get(el.dataset.id);if(m)msgToRoom(m)},
   loadMore:()=>{const c=$('#chat');const h=c.scrollHeight;S.win+=200;renderChat(false);c.scrollTop=c.scrollHeight-h},
