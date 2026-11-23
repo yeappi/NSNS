@@ -489,9 +489,16 @@ body:has(.backdrop) #toast{bottom:auto;top:calc(14px + env(safe-area-inset-top,0
 .dvrow{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;padding:8px 12px;margin-bottom:4px;box-shadow:var(--shadow);cursor:pointer}
 .dvrow .ic{font-size:18px;flex:none;width:24px;text-align:center}.dvrow .t{flex:1;min-width:0;font-size:14.5px}.dvrow small{display:block;font-size:11.5px;color:var(--sub);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dvfav,.dvfavb{font-size:20px;color:#C9BFB4}.dvfav.on,.dvfavb.on{color:#E9A93C}
-.dvn{flex:none;font-size:11px;background:var(--accent-soft);color:var(--accent-ink);border-radius:9px;padding:1px 8px;font-weight:500}
+.dvn{flex:none;font-size:11px;background:#EDE7E0;color:#6d655d;border-radius:9px;padding:1px 8px;font-weight:500}
 .dvempty{font-size:12.5px;color:var(--sub);padding:6px 6px 10px}
 .dvf{display:flex;flex-direction:column;gap:6px;margin:4px 0 8px}
+.seg4{display:flex;background:#EFEAE4;border-radius:12px;padding:3px;margin:2px 0 8px}.seg4 button{flex:1;text-align:center;font-size:13px;padding:6px;border-radius:10px;color:#6d655d;font-weight:500}.seg4 button.on{background:#fff;color:var(--ink);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.fline{display:flex;align-items:center;gap:6px;padding:2px 2px 10px;font-size:12px;color:var(--sub);overflow:hidden;cursor:pointer}.fline .fl{font-weight:600;margin-right:2px;white-space:nowrap}.fline .fc{background:var(--card);border-radius:10px;padding:2px 9px;color:#4a443e;white-space:nowrap}.fline b{margin-left:auto;color:var(--accent-ink);font-weight:500;white-space:nowrap;padding-left:6px}
+.dvrow.un{background:transparent;box-shadow:none;border:1.5px dashed #E4DCD3}
+.dvstar svg{stroke:currentColor;fill:none}.dvstar.on{color:#E9A93C}.dvstar.on svg{fill:#E9A93C}
+.icon.on{background:var(--chat)}
+#dvfs .flabel{margin:10px 2px 6px}#dvfs .chip.in{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.dark{background:var(--ink);color:#fff;font-weight:600}
 .dvgrp{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .dvday{font-size:11px;color:var(--sub);text-align:center;margin:12px 0 6px}
 .dvnote{font-size:11px;color:var(--sub);margin-left:6px}
@@ -589,6 +596,7 @@ const PALETTE=['#F9D9CB','#DCEBD4','#D6E3F3','#EADFF3','#F6E8BC','#D2EBE7','#F5D
 const EMOJIS=['💡','📝','📔','🗺','🧠','🌱','🎮','🎨','📚','💬','⭐','🔥','🌙','☕','🎵','📷','💼','🏠','❤️','🛠','✈️','🍳','💰','🐈'];
 const IC=(d,w)=>`<svg viewBox="0 0 24 24">${d}</svg>`;
 const ICONS={
+  star:IC('<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/>'),
   bmk:IC('<path d="M6 3h12v18l-6-4-6 4z"/><path d="M12 7v6M9 10h6"/>'),
   tidy:IC('<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/>'),
   search:IC('<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>'),
@@ -2811,12 +2819,25 @@ function dvFilterHTML(v){
   const f=v.f,g=v.group;
   const chips=(arr,cur,key,multi)=>arr.map(([id,l])=>`<span class="chip ${multi?(cur.includes(id)?'in':''):(cur===id?'in':'')}" data-act="dv" data-d="${key}" data-v="${esc(id)}">${l}</span>`).join('');
   const all=allTags();const tags=S.dv.allTags?all.slice(0,40):all.slice(0,6);if(f.tag&&!tags.includes(f.tag))tags.unshift(f.tag);const moreT=!S.dv.allTags&&all.length>6;
-  return `<div class="dvf"><div class="searchbox dvq">${ICONS.search}<input id="dvq" placeholder="本文で探す" value="${esc(f.q||'')}"></div>
-    <div class="chips">${chips(DV_RANGES,f.range||'','range',false)}</div>
-    ${g==='kind'?'':`<div class="chips">${chips([...KINDS.map(k=>[k.id,k.ic+k.label]),['none','未分類']],f.kinds,'kind',true)}</div>`}
-    <div class="chips">${chips([...STS.map(x=>[x.id,x.label]),['none','状態なし']],f.sts,'st',true)}<span class="chip ${f.arch?'in':''}" data-act="dv" data-d="arch">🗄 アーカイブも</span></div>
-    ${g==='tag'||!tags.length?'':`<div class="chips">${tags.map(t=>`<span class="chip ${f.tag===t?'in':''}" data-act="dv" data-d="tag" data-v="${esc(t)}">#${esc(t)}</span>`).join('')}${moreT?`<span class="chip add" data-act="dv" data-d="moreT">もっと（${all.length-6}）</span>`:''}</div>`}</div>`;
+  return `<div class="dvf">
+    <div class="flabel">期間</div><div class="chips">${chips(DV_RANGES,f.range||'','range',false)}</div>
+    ${g==='kind'?'':`<div class="flabel">種類</div><div class="chips">${chips([...KINDS.map(k=>[k.id,k.ic+k.label]),['none','未分類']],f.kinds,'kind',true)}</div>`}
+    <div class="flabel">状態</div><div class="chips">${chips([...STS.map(x=>[x.id,x.label]),['none','状態なし']],f.sts,'st',true)}</div>
+    ${g==='tag'||!tags.length?'':`<div class="flabel">タグ</div><div class="chips">${tags.map(t=>`<span class="chip ${f.tag===t?'in':''}" data-act="dv" data-d="tag" data-v="${esc(t)}">#${esc(t)}</span>`).join('')}${moreT?`<span class="chip add" data-act="dv" data-d="moreT">もっと ${all.length-6}</span>`:''}</div>`}
+    <div class="flabel">ほか</div><div class="chips"><span class="chip ${f.arch?'in':''}" data-act="dv" data-d="arch">🗄 アーカイブも含める</span></div></div>`;
 }
+function dvSumHTML(v){const f=v.f;const p=[];const rg=DV_RANGES.find(x=>x[0]===(f.range||''));p.push(rg?rg[1]:'全期間');
+  if(v.group!=='kind')(f.kinds||[]).forEach(k=>p.push(k==='none'?'未分類':KIND[k]?KIND[k].ic+KIND[k].label:k));
+  p.push(...((f.sts||[]).length?f.sts.map(k=>k==='none'?'状態なし':STL[k]||k):['すべての状態']));if(f.tag)p.push('#'+f.tag);if(f.arch)p.push('🗄 アーカイブ込み');
+  return `<div class="fline" data-act="dv" data-d="fsheet"><span class="fl">絞り込み</span>${p.map(x=>`<span class="fc">${esc(x)}</span>`).join('')}<b>変更</b></div>`}
+function dvQHTML(v){return S.dv.showF||v.f.q?`<div class="searchbox dvq">${ICONS.search}<input id="dvq" placeholder="本文で探す" value="${esc(v.f.q||'')}"></div>`:''}
+function dvCount(v){return lvCollect(v.f).filter(m=>m.by!=='ai').length}
+function dvFilterSheet(){const v=S.dv.v;if(!v)return;
+  const sh=openSheet(`<h3>絞り込み</h3><div id="dvfs">${dvFilterHTML(v)}</div><div class="btns" style="margin-top:14px"><button class="btn" data-x="reset">リセット</button><button class="btn dark" data-x="ok" style="flex:2"></button></div>`);
+  const upd=()=>{const vv=S.dv.v;sh.querySelector('#dvfs').innerHTML=dvFilterHTML(vv);sh.querySelector('[data-x=ok]').textContent=`${dvCount(vv)}件を表示`};upd();sh._upd=upd;
+  sh.querySelector('[data-x=ok]').onclick=()=>closeSheet();
+  sh.querySelector('[data-x=reset]').onclick=()=>{dvDetach();const vv=S.dv.v;const q=vv.f.q;vv.f=dvF();vv.f.q=q;if(vv.group==='digest')vv.f.docsOnly=true;dvPersist(vv);renderList();upd()}}
+function dvSegHTML(v){return `<div class="seg4">${[['kind','種類'],['tag','タグ'],['digest','月'],['none','1室']].map(([id,l])=>`<button class="${v.group===id?'on':''}" data-act="dv" data-d="group" data-v="${id}">${l}</button>`).join('')}</div>`}
 function dvBubHTML(m){
   const ai=m.by==='ai';const D=S.dv;const sel=D.sel&&D.sel.has(m.id);
   const meta=ai?'':[m.pinned?'<span>📢</span>':'',m.st&&STL[m.st]?`<span class="sc ${m.st}">${STL[m.st]}</span>`:'',(m.tags||[]).length?`<span class="at">${m.tags.map(t=>'#'+esc(t)).join(' ')}</span>`:'',m.fromView?'<span>🗃</span>':''].join('');
@@ -2863,7 +2884,7 @@ function renderData(P){
       const icon=ic||(v.gv!=null&&v.group==='kind'&&KIND[v.gv]?KIND[v.gv].ic:direct?'💬':'🗂');
       return `<div class="dvrow" data-act="dv" data-d="open" data-id="${esc(v.id)}"><span class="ic">${icon}</span><div class="t">${esc(v.name)}<small>${direct?(pv(l[l.length-1])||'まだメモがありません'):esc(dvSub(v))}</small></div>${direct?`<span class="dvn">${l.length}</span>`:''}${isP?'':`<button class="dvfav${v.fav?' on':''}" data-act="dv" data-d="fav" data-id="${esc(v.id)}">${v.fav?'★':'☆'}</button>`}</div>`};
     const kv=DV_PRESETS.find(x=>x.id==='p:kind');const kg=dvGroups(kv);
-    const krow=g=>`<div class="dvrow" data-act="dv" data-d="kroom" data-v="${esc(g.k)}"><span class="ic">${KIND[g.k]?KIND[g.k].ic:'📝'}</span><div class="t">${KIND[g.k]?KIND[g.k].label:'未分類'}<small>${pv(g.lm)}</small></div><span class="dvn">${g.n}</span></div>`;
+    const krow=g=>`<div class="dvrow${g.k==='none'?' un':''}" data-act="dv" data-d="kroom" data-v="${esc(g.k)}"><span class="ic">${KIND[g.k]?KIND[g.k].ic:'📝'}</span><div class="t">${KIND[g.k]?KIND[g.k].label:'未分類'}<small>${pv(g.lm)}</small></div><span class="dvn">${g.n}</span></div>`;
     head=`<div class="top"><div class="brand">データ <small>束ねて俯瞰する</small></div><button class="icon" data-act="dv" data-d="search" title="本文で探す">${ICONS.search}</button></div>`;
     body=`<div class="aipendw">${aiPendHTML()}</div>${fav.length?`<div class="dvh">⭐ お気に入り</div>${fav.map(v=>row(v)).join('')}`:''}
       <div class="dvh">種類別のトークルーム</div>${kg.map(krow).join('')||'<div class="dvempty">メモに種類が付くと、ここに並びます</div>'}
@@ -2880,7 +2901,7 @@ function renderData(P){
       const fsum=()=>{const f=v.f;const p=[];const rg=DV_RANGES.find(x=>x[0]===(f.range||''));if(f.range)p.push(rg[1]);
         (f.kinds||[]).forEach(k=>p.push(k==='none'?'未分類':KIND[k]?KIND[k].ic+KIND[k].label:k));(f.sts||[]).forEach(k=>p.push(k==='none'?'状態なし':STL[k]||k));if(f.tag)p.push('#'+f.tag);if(f.q)p.push('「'+f.q+'」');if(f.arch)p.push('🗄');
         return p.length?`<div class="dvsum" data-act="dv" data-d="showF">${p.map(x=>`<span>${esc(x)}</span>`).join('')}<b>変更</b></div>`:''};
-      fixed=(D.showF?dvFilterHTML(v):fsum())
+      fixed=dvQHTML(v)+(v.group==='none'?dvSegHTML(v):'')+dvSumHTML(v)
         +(unc&&!D.sel?`<div class="dvbar"><span>未分類 ${ms.filter(m=>m.by!=='ai').length}件</span><button data-act="dv" data-d="selstart">選んで分類</button><button data-act="dv" data-d="aicls">🤖 AIで分類</button></div>`:'');
       let day='',prev='';
       chat=(done.length&&!(v.f.sts.length===1&&v.f.sts[0]==='done')?`<div class="dvdone"><button data-act="dv" data-d="showDone">${D.showDone?`完了した${done.length}件を隠す`:`✓ 完了した${done.length}件を表示`}</button></div>`:'')
@@ -2889,17 +2910,17 @@ function renderData(P){
           return h+dvBubHTML(m)}).join('')||'<div class="roomempty"><div>条件に合うメモがありません'+(dvCanWrite(v)?'<br><span style="font-size:11.5px">下から書くと、このビューの印を付けて保存します</span>':'')+'</div></div>');
     }else{
       const gs=dvGroups(v);
-      body=`${dvFilterHTML(v)}<div class="dvgrp">${DV_GROUPS.filter(x=>x[0]!=='none').map(([id,l])=>`<span class="chip ${v.group===id?'in':''}" data-act="dv" data-d="group" data-v="${id}">${l}</span>`).join('')}<span class="chip" data-act="dv" data-d="group" data-v="none">まとめて1室</span></div>`
-        +(gs.map(g=>`<div class="dvrow" data-act="dv" data-d="room" data-v="${esc(g.k)}"><span class="ic">${v.group==='kind'&&KIND[g.k]?KIND[g.k].ic:v.group==='tag'?'🏷':v.group==='digest'?'📎':'💬'}</span><div class="t">${esc(v.group==='kind'&&KIND[g.k]?KIND[g.k].label:g.label)}<small>${esc(((g.lm.text||'📷 画像').replace(/\n/g,' ')).slice(0,40))}</small></div><span class="dvn">${g.n}</span></div>`).join('')||'<div class="empty" style="padding:30px">条件に合うメモがありません</div>');
+      body=`${dvQHTML(v)}${dvSegHTML(v)}${dvSumHTML(v)}`
+        +(gs.map(g=>`<div class="dvrow${g.k==='none'||g.k==='__none'?' un':''}" data-act="dv" data-d="room" data-v="${esc(g.k)}"><span class="ic">${v.group==='kind'&&KIND[g.k]?KIND[g.k].ic:v.group==='tag'?'🏷':v.group==='digest'?'📎':'💬'}</span><div class="t">${esc(v.group==='kind'&&KIND[g.k]?KIND[g.k].label:g.label)}<small>${esc(((g.lm.text||'📷 画像').replace(/\n/g,' ')).slice(0,40))}</small></div><span class="dvn">${g.n}</span></div>`).join('')||'<div class="empty" style="padding:30px">条件に合うメモがありません</div>');
     }
     if(D.sel){
       head=`<div class="top"><button class="icon" data-act="dv" data-d="selx" title="選択をやめる">${ICONS.close}</button>
         <div class="ttl"><div class="tx"><div class="nm">${D.sel.size}件を選択</div><div class="sb">${esc(dvTitle(v,gv))}</div></div></div>
         <button class="chip" data-act="dv" data-d="selall" style="margin-right:6px">すべて選択</button></div>`;
     }else head=`<div class="top"><button class="icon" data-act="dv" data-d="back" title="戻る">${ICONS.back}</button>
-      <div class="ttl"><div class="tx"><div class="nm">${esc(dvTitle(v,inRoom?gv:null))}</div><div class="sb">${inRoom?'抽出ルーム':'ビュー'}${changed?' · 条件を変更中':''}</div></div></div>
-      ${inRoom?`<button class="dvfbtn${D.showF?' on':''}" data-act="dv" data-d="showF">絞込${dvFCount(v)?`<i>${dvFCount(v)}</i>`:''}</button>`:''}
-      <button class="icon dvfavb${v.fav?' on':''}" data-act="dv" data-d="${saved?'favcur':'save'}" title="${saved?'お気に入り':'ビューを保存'}">${saved?(v.fav?'★':'☆'):ICONS.bmk}</button>
+      <div class="ttl"><div class="tx"><div class="nm">${esc(dvTitle(v,inRoom?gv:null))}</div><div class="sb">${inRoom?dvRoomMsgs(v,gv).filter(m=>m.by!=='ai').length:dvCount(v)}件 · ${esc((DV_RANGES.find(x=>x[0]===(v.f.range||''))||['','全期間'])[1])}${changed?' · 未保存':''}</div></div></div>
+      <button class="icon${D.showF||v.f.q?' on':''}" data-act="dv" data-d="showF" title="本文で探す">${ICONS.search}</button>
+      <button class="icon dvstar${saved&&v.fav?' on':''}" data-act="dv" data-d="${saved?'favcur':'save'}" title="${saved?(v.fav?'お気に入りから外す':'お気に入りにする'):'ビューを保存'}">${ICONS.star}</button>
       <button class="icon" data-act="dv" data-d="export" title="書き出す">${ICONS.out}</button>
       <button class="icon" data-act="dv" data-d="menu" title="メニュー">${ICONS.more}</button></div>`;
   }
@@ -2942,7 +2963,7 @@ const dvSelList=()=>[...(S.dv.sel||[])].map(id=>S.msgs.get(id)).filter(Boolean);
 function dvAct(el,e){
   if(e)e.stopPropagation();const D=S.dv,d=el.dataset.d;let v=D.v;
   const detach=()=>{dvDetach();v=D.v};
-  const touchF=()=>{dvPersist(v);renderList()};
+  const touchF=()=>{dvPersist(v);renderList();const fs=$('#dvfs');if(fs){const sh=fs.closest('.sheet');if(sh&&sh._upd)sh._upd()}};
   switch(d){
     case 'open':{D.from=null;const id=el.dataset.id;const sv=id.startsWith('p:')?DV_PRESETS.find(x=>x.id===id):dvSaved().find(x=>x.id===id);if(!sv)break;
       D.v=clone(sv);D.v.f=dvF(D.v.f);if(sv.gv!=null){D.gv=sv.gv;D.mode='room'}else{D.gv=null;D.mode='groups'}
@@ -2963,7 +2984,8 @@ function dvAct(el,e){
         {icon:'💬',label:'この抽出ルームを保存',sub:`「${dvLabel(v.group,D.gv)}」を直接開く`,fn:()=>dvSaveCur(true)},
         {icon:'🗂',label:'束ね方ごと保存',sub:`${DV_GROUPS.find(x=>x[0]===v.group)[1]}の一覧として`,fn:()=>dvSaveCur(false)}]);else dvSaveCur(false);break}
     case 'send':dvSend();break;
-    case 'showF':D.showF=!D.showF;renderList();if(D.showF)setTimeout(()=>{if(!isTouch())$('#dvq')?.focus()},30);break;
+    case 'showF':D.showF=!(D.showF||(v&&v.f.q));if(!D.showF&&v&&v.f.q){detach();v.f.q='';dvPersist(v)}renderList();if(D.showF)setTimeout(()=>{$('#dvq')?.focus()},30);break;
+    case 'fsheet':dvFilterSheet();break;
     case 'showDone':D.showDone=!D.showDone;D.keepScroll=true;renderList();break;
     case 'jump':{const m=S.msgs.get(el.dataset.id);if(m)openRoom(m.roomId,m.id);break}
     case 'tapm':{const m=S.msgs.get(el.dataset.id);if(!m)break;
